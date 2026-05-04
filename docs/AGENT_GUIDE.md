@@ -5,6 +5,71 @@
 
 ---
 
+## ★ Contesto autore e tesi (leggi PRIMA di tutto)
+
+**Chi sono:** virus212, studente universitario in **cybersecurity**. Sto sviluppando questo progetto come **tesi di laurea**.
+
+**Lingua:** italiano. Risponde in italiano. Il codice/log/comment in inglese, l'interfaccia utente in italiano.
+
+**Livello tecnico:** mi descrivo come "novellino" sul lato pratico, ma con buona comprensione concettuale. Apprezzo:
+- Spiegazioni concise (1 frase) sul *cosa* e *perché* delle modifiche
+- Stile direzione tersa (rispondo con poche parole, scelgo tra opzioni numerate)
+- Niente sermoni, niente walls-of-text — vado dritto al punto
+
+**Cos'è il progetto:** "**Dark Triad**" è una pipeline di tool open-source per l'**automazione end-to-end della profilazione di un target via chat**, fino alla generazione di una wordlist mirata di password.
+
+```
+Tesi in una frase:
+"Le chat di una persona contengono il dizionario delle sue password."
+
+Tesi in tre frasi:
+"I tool esistenti (CUPP, Mentalist, bopscrk) richiedono di sapere già i dati
+del target (nome, animale, partner, hobby). Il mio approccio inverte: parto
+dalle chat reali del target ed estraggo automaticamente persone, luoghi,
+emoji, pattern di forward, menzioni, GPS dalle foto. Da questa profilazione
+genero una wordlist molto più rappresentativa del lessico personale del
+target rispetto a un dizionario manuale."
+```
+
+**Perché è innovativo (per la commissione di tesi):**
+- Nessun tool esistente combina extraction + analysis + wordlist gen in pipeline integrata
+- `author_uid` cross-chat è una soluzione originale al problema di re-identificare lo stesso utente in canali diversi con username/display name diversi
+- Reverse-geocoding offline + emoji-to-words translator + dynamic Hashcat rules sono feature che CUPP/Mentalist non hanno
+- Italian-first NER (spaCy `it_core_news_sm`) → risultati migliori su target italiani rispetto a regex generiche
+
+**Stato sviluppo:**
+- ✅ FASE 1 TIH (estrazione + arricchimento dati)
+- ✅ FASE 2 Mihawk (visualizzazione + analisi cross-chat)
+- ✅ FASE 3 Horcrux (generazione wordlist + Smart Wizard + standalone mode)
+- 🟡 FASE 4 JARVIS (questo doc serve a costruirlo) — NON iniziata
+- 🟡 FASE 5 Documentazione finale + benchmark vs CUPP per la tesi
+
+**Cosa farà JARVIS quando lo costruiremo:**
+- Leggerà questo guide all'avvio per capire la pipeline
+- Userà Claude API (preferenza dell'autore) per ragionare sui dati
+- Endpoint Mihawk → costruisce profilo target → seleziona feature ottimali → chiama Horcrux
+- UI semplice: "dammi questo target → wordlist ottimizzata in output"
+- Spiegherà il ragionamento ("ho scelto queste keyword perché...")
+
+**Considerazioni etiche per la tesi:**
+- Tutti i tool hanno disclaimer di uso autorizzato (vedi README di ciascuno)
+- Il progetto è esplicitamente per **ricerca + pentesting autorizzato + analisi delle proprie chat**
+- Output (wordlist) usa solo dati pubblici / di proprietà dell'utente / con consenso
+
+**Repository GitHub:**
+- https://github.com/virus212/The-Invisible-Hand
+- https://github.com/virus212/Mihawk
+- https://github.com/virus212/horcrux
+
+**Scelte di stile da rispettare quando lavori sul progetto:**
+- Modifiche chirurgiche, non rewrite di interi file
+- Backward compatibility: dati estratti col vecchio TIH devono continuare a funzionare
+- Test funzionali leggeri (un curl/script sintetico) > test unitari pesanti
+- README aggiornati con sezione "Novità v2.0" — mantenere lo stile già esistente
+- Commit message in inglese, descrittivi, senza emoji nel titolo
+
+---
+
 ## 0. Pipeline overview
 
 ```
