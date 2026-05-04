@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HORCRUX · Wordlist Generator</title>
+  <link rel="icon" type="image/png" href="/static/favicon.png">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/manual.css">
+  <link rel="stylesheet" href="/static/ritual.css">
+</head>
+<body>
+  <!-- Toast container -->
+  <div id="toastContainer"></div>
+
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-title">
+        <img src="/static/stemma.png" alt="Horcrux" class="header-stemma">
+        <span class="title-amber">⬢</span> HORCRUX <span class="title-amber">⬢</span>
+      </div>
+      <div class="mode-switch">
+        <a href="/manual" class="mode-link" title="Crea wordlist manualmente, senza chat">
+          ✍ Modalità Manuale
+        </a>
+        <a href="/logout" class="logout-btn">logout</a>
+      </div>
+    </header>
+
+    <div class="app-body">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-header">CANALI</div>
+        <div class="channels-list" id="channelsList">
+          <div class="spinner">caricamento…</div>
+        </div>
+        <div class="standalone-divider">— oppure —</div>
+        <button id="standaloneBtn" class="btn btn-secondary standalone-btn" title="Genera wordlist senza chat, solo da OSINT/manual input">
+          🆕 Modalità Standalone
+        </button>
+      </aside>
+
+      <!-- Main content -->
+      <main class="main-content">
+        <div id="mainView" class="view hidden">
+          <section class="section welcome">
+            <p>Seleziona un canale dalla sidebar per iniziare</p>
+          </section>
+        </div>
+
+        <div id="contentView" class="view hidden">
+          <!-- Channel info -->
+          <section class="section channel-info">
+            <div class="info-row">
+              <span class="info-label">Canale:</span>
+              <span class="info-value" id="channelName">-</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Messaggi:</span>
+              <span class="info-value" id="messageCount">-</span>
+            </div>
+
+            <!-- User selector for groups -->
+            <div id="userSelectorSection" class="user-selector hidden">
+              <label for="userSelect">Seleziona utente da investigare:</label>
+              <select id="userSelect">
+                <option value="">-- Tutti gli utenti --</option>
+              </select>
+              <span class="info-hint" id="userHint"></span>
+
+              <!-- Multi-channel option -->
+              <label class="multi-checkbox">
+                <input type="checkbox" id="multiChannelCheckbox">
+                <span>🔍 Cerca anche in altri canali (multi-channel merge)</span>
+              </label>
+            </div>
+
+            <button id="extractBtn" class="btn btn-primary">Estrai Features</button>
+          </section>
+
+          <!-- Multi-channel info banner -->
+          <section id="multiChannelBanner" class="section hidden multi-banner">
+            <strong>📡 Multi-channel attivo</strong>
+            <div id="matchedChannelsList"></div>
+          </section>
+
+          <!-- Search Section -->
+          <section class="section">
+            <h2>🔍 Ricerca nei messaggi</h2>
+            <p class="section-desc">Cerca termini specifici e visualizza il contesto. Utile per trovare keyword che lo script ha mancato.</p>
+            <div class="search-form">
+              <input type="text" id="searchInput" class="search-input" placeholder="es. amore, vacanze, tato...">
+              <button id="searchBtn" class="btn btn-primary">Cerca</button>
+            </div>
+            <div id="searchResults" class="search-results hidden"></div>
+          </section>
+
+          <!-- Topics -->
+          <section id="topicsSection" class="section hidden">
+            <h2>🎯 Interessi rilevati</h2>
+            <div class="topics-container" id="topicsTags"></div>
+          </section>
+
+          <!-- Features -->
+          <section id="featuresSection" class="section hidden">
+            <h2>Features Estratte</h2>
+
+            <div class="edit-hint">💡 Clicca X per rimuovere · Scrivi più parole separate da spazio per aggiungere più tag · Es: "cane lilli" → aggiunge "cane" e "lilli"</div>
+
+            <div class="features-grid">
+              <div class="feature-card">
+                <h3>Nomi</h3>
+                <div class="tags-container" id="namesTags"></div>
+                <div class="add-tag-form">
+                  <input type="text" class="add-tag-input" data-category="names" placeholder="nuovo nome...">
+                  <button class="add-tag-btn" data-category="names">+</button>
+                </div>
+              </div>
+
+              <div class="feature-card">
+                <h3>Date / Anni</h3>
+                <div class="tags-container" id="datesTags"></div>
+                <div class="add-tag-form">
+                  <input type="text" class="add-tag-input" data-category="dates" placeholder="es. 1990, 15/03/1990...">
+                  <button class="add-tag-btn" data-category="dates">+</button>
+                </div>
+              </div>
+
+              <div class="feature-card">
+                <h3>Animali</h3>
+                <div class="tags-container" id="animalsTags"></div>
+                <div class="add-tag-form">
+                  <input type="text" class="add-tag-input" data-category="animals" placeholder="es. gatto, cane...">
+                  <button class="add-tag-btn" data-category="animals">+</button>
+                </div>
+              </div>
+
+              <div class="feature-card">
+                <h3>Numeri</h3>
+                <div class="tags-container" id="numbersTags"></div>
+                <div class="add-tag-form">
+                  <input type="text" class="add-tag-input" data-category="numbers" placeholder="nuovo numero...">
+                  <button class="add-tag-btn" data-category="numbers">+</button>
+                </div>
+              </div>
+
+              <div class="feature-card">
+                <h3>📞 Telefoni</h3>
+                <div class="tags-container" id="phonesTags"></div>
+                <div class="add-tag-form">
+                  <input type="text" class="add-tag-input" data-category="phones" placeholder="numero di telefono...">
+                  <button class="add-tag-btn" data-category="phones">+</button>
+                </div>
+              </div>
+
+              <div class="feature-card">
+                <h3>🎂 Età → Anni nascita</h3>
+                <div class="tags-container" id="agesTags"></div>
+                <div class="add-tag-form">
+                  <input type="text" class="add-tag-input" data-category="ages_birth_years" placeholder="es. 1995, 95...">
+                  <button class="add-tag-btn" data-category="ages_birth_years">+</button>
+                </div>
+              </div>
+
+              <div class="feature-card">
+                <h3>Keywords Top</h3>
+                <div class="tags-container" id="keywordsTags"></div>
+                <div class="add-tag-form">
+                  <input type="text" class="add-tag-input" data-category="keywords" placeholder="nuovo keyword...">
+                  <button class="add-tag-btn" data-category="keywords">+</button>
+                </div>
+              </div>
+
+              <div class="feature-card">
+                <h3>🏷️ Brand</h3>
+                <div class="tags-container" id="brandsTags"></div>
+                <div class="add-tag-form">
+                  <input type="text" class="add-tag-input" data-category="brands" placeholder="es. spotify, ferrari...">
+                  <button class="add-tag-btn" data-category="brands">+</button>
+                </div>
+              </div>
+
+              <div class="feature-card">
+                <h3>💕 Soprannomi</h3>
+                <div class="tags-container" id="nicknamesTags"></div>
+                <div class="add-tag-form">
+                  <input type="text" class="add-tag-input" data-category="nicknames" placeholder="es. amore, bro...">
+                  <button class="add-tag-btn" data-category="nicknames">+</button>
+                </div>
+              </div>
+
+              <div class="feature-card">
+                <h3>💬 Frasi tipiche (bigrammi)</h3>
+                <div class="tags-container" id="phrasesTags"></div>
+                <div class="add-tag-form">
+                  <input type="text" class="add-tag-input" data-category="phrases" placeholder="es. amore mio...">
+                  <button class="add-tag-btn" data-category="phrases">+</button>
+                </div>
+              </div>
+
+              <div class="feature-card">
+                <h3>Emoji</h3>
+                <div class="tags-container" id="emojiTags"></div>
+                <div class="add-tag-form">
+                  <input type="text" class="add-tag-input" data-category="emojis" placeholder="emoji...">
+                  <button class="add-tag-btn" data-category="emojis">+</button>
+                </div>
+              </div>
+
+              <!-- ── NUOVE FEATURE TIH-enriched ────────────────────────── -->
+              <div class="feature-card tih-card">
+                <h3>👥 Persone (NER)</h3>
+                <div class="tags-container" id="nerPersonsTags"></div>
+                <div class="add-tag-form">
+                  <input type="text" class="add-tag-input" data-category="ner_persons" placeholder="nome persona...">
+                  <button class="add-tag-btn" data-category="ner_persons">+</button>
+                </div>
+              </div>
+
+              <div class="feature-card tih-card">
+                <h3>📍 Luoghi (NER)</h3>
+                <div class="tags-container" id="nerLocationsTags"></div>
+                <div class="add-tag-form">
+                  <input type="text" class="add-tag-input" data-category="ner_locations" placeholder="nome luogo...">
+                  <button class="add-tag-btn" data-category="ner_locations">+</button>
+                </div>
+              </div>
+
+              <div class="feature-card tih-card">
+                <h3>🏢 Organizzazioni (NER)</h3>
+                <div class="tags-container" id="nerOrgsTags"></div>
+                <div class="add-tag-form">
+                  <input type="text" class="add-tag-input" data-category="ner_orgs" placeholder="organizzazione...">
+                  <button class="add-tag-btn" data-category="ner_orgs">+</button>
+                </div>
+              </div>
+
+              <div class="feature-card tih-card">
+                <h3>🌍 Città GPS (foto)</h3>
+                <div class="tags-container" id="gpsCitiesTags"></div>
+                <div class="add-tag-form">
+                  <input type="text" class="add-tag-input" data-category="gps_cities" placeholder="citta...">
+                  <button class="add-tag-btn" data-category="gps_cities">+</button>
+                </div>
+              </div>
+
+              <div class="feature-card tih-card">
+                <h3>@ Menzioni</h3>
+                <div class="tags-container" id="mentionsTags"></div>
+                <div class="add-tag-form">
+                  <input type="text" class="add-tag-input" data-category="mentions" placeholder="@username...">
+                  <button class="add-tag-btn" data-category="mentions">+</button>
+                </div>
+              </div>
+
+              <div class="feature-card tih-card">
+                <h3>↪️ Forward sources</h3>
+                <div class="tags-container" id="forwardTopicsTags"></div>
+                <div class="add-tag-form">
+                  <input type="text" class="add-tag-input" data-category="forward_topics" placeholder="canale source...">
+                  <button class="add-tag-btn" data-category="forward_topics">+</button>
+                </div>
+              </div>
+
+              <div class="feature-card tih-card">
+                <h3>🔤 Keywords da emoji</h3>
+                <div class="tags-container" id="emojiKeywordsTags"></div>
+                <div class="add-tag-form">
+                  <input type="text" class="add-tag-input" data-category="emoji_keywords" placeholder="parola...">
+                  <button class="add-tag-btn" data-category="emoji_keywords">+</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Profile save/load buttons -->
+            <div class="profile-actions">
+              <button id="saveProfileBtn" class="btn btn-secondary">💾 Salva profilo</button>
+              <button id="loadProfileBtn" class="btn btn-secondary">📂 Carica profilo</button>
+            </div>
+          </section>
+
+          <!-- OSINT Enrichment Section (Stage 3) -->
+          <section id="osintSection" class="section hidden">
+            <h2>🔬 OSINT Enrichment</h2>
+            <p class="section-desc">
+              Arricchimento automatico: lookup telefoni, geo, email, generazione username candidates.
+              Tutto offline + opzionale check social network.
+            </p>
+
+            <!-- Quick OSINT inline lookups (Smart Wizard) -->
+            <div class="quick-osint-panel">
+              <h3>🚀 Quick OSINT Lookup</h3>
+              <p class="section-desc">
+                Inserisci un dato del target e ottieni token aggiuntivi per la wordlist.
+                I risultati vengono aggiunti automaticamente alle feature card sopra.
+              </p>
+              <div class="quick-osint-grid">
+                <div class="quick-row">
+                  <label>📞 Telefono</label>
+                  <div class="quick-form">
+                    <input type="text" id="quickPhoneInput" placeholder="es. +39 333 1234567">
+                    <button class="btn btn-secondary quick-btn" data-quick="phone">Lookup</button>
+                  </div>
+                </div>
+                <div class="quick-row">
+                  <label>📧 Email</label>
+                  <div class="quick-form">
+                    <input type="text" id="quickEmailInput" placeholder="es. mario.rossi@gmail.com">
+                    <button class="btn btn-secondary quick-btn" data-quick="email">Lookup</button>
+                  </div>
+                </div>
+                <div class="quick-row">
+                  <label>🏙️ Città / luogo</label>
+                  <div class="quick-form">
+                    <input type="text" id="quickLocationInput" placeholder="es. Padova, Milano...">
+                    <button class="btn btn-secondary quick-btn" data-quick="location">Lookup</button>
+                  </div>
+                </div>
+                <div class="quick-row">
+                  <label>🆔 Codice Fiscale</label>
+                  <div class="quick-form">
+                    <input type="text" id="quickCfInput" placeholder="es. RSSMRA85M01H501Z">
+                    <button class="btn btn-secondary quick-btn" data-quick="cf">Parse</button>
+                  </div>
+                </div>
+                <div class="quick-row">
+                  <label>👤 Username candidates</label>
+                  <div class="quick-form">
+                    <input type="text" id="quickUsernameInput" placeholder="nome cognome anno (es. Mario Rossi 1990)">
+                    <button class="btn btn-secondary quick-btn" data-quick="username">Genera</button>
+                  </div>
+                </div>
+              </div>
+              <div id="quickOsintResult" class="quick-result"></div>
+            </div>
+
+            <div class="osint-actions">
+              <button id="enrichOsintBtn" class="btn btn-primary">🪄 Arricchisci automaticamente (da chat)</button>
+              <button id="addOsintTokensBtn" class="btn btn-success hidden">➕ Aggiungi tokens al wordlist</button>
+            </div>
+
+            <div id="osintResults" class="osint-results hidden">
+              <div class="osint-grid">
+                <!-- Phones -->
+                <div class="osint-card">
+                  <h3>📞 Telefoni</h3>
+                  <div id="osintPhones" class="osint-data"></div>
+                </div>
+
+                <!-- Locations -->
+                <div class="osint-card">
+                  <h3>📍 Luoghi</h3>
+                  <div id="osintLocations" class="osint-data"></div>
+                </div>
+
+                <!-- Usernames -->
+                <div class="osint-card">
+                  <h3>👤 Username candidates</h3>
+                  <div id="osintUsernames" class="osint-data"></div>
+                </div>
+
+                <!-- Emails -->
+                <div class="osint-card">
+                  <h3>📧 Email rilevate</h3>
+                  <div id="osintEmails" class="osint-data"></div>
+                </div>
+              </div>
+
+              <div class="osint-summary" id="osintSummary"></div>
+            </div>
+
+            <!-- Social Username Check -->
+            <div class="social-check-panel">
+              <h3>🌐 Social username check</h3>
+              <p class="section-desc">
+                Controlla se un username esiste su 20+ piattaforme (GitHub, Reddit, Instagram, ecc.).
+                Solo URL pubblici, nessun login.
+              </p>
+              <div class="social-form">
+                <input type="text" id="socialUsernameInput" class="search-input"
+                       placeholder="es. mario_rossi">
+                <button id="socialCheckBtn" class="btn btn-primary">🚀 Check</button>
+              </div>
+              <div id="socialResults" class="social-results hidden"></div>
+            </div>
+
+            <!-- Online Tools Panel (Stage 3.5) -->
+            <div class="online-tools-panel">
+              <h3>🛠️ Online Tools (network)</h3>
+              <p class="section-desc">
+                Tool aggiuntivi che usano API pubbliche gratuite.
+                WHOIS, DNS, IP geo, Wayback, Email reputation, GitHub/Reddit profile, Codice Fiscale.
+              </p>
+
+              <div class="tools-tabs">
+                <button class="tool-tab active" data-tool="whois">WHOIS</button>
+                <button class="tool-tab" data-tool="dns">DNS</button>
+                <button class="tool-tab" data-tool="ip-geo">IP Geo</button>
+                <button class="tool-tab" data-tool="wayback">Wayback</button>
+                <button class="tool-tab" data-tool="email-rep">Email Rep</button>
+                <button class="tool-tab" data-tool="github-user">GitHub</button>
+                <button class="tool-tab" data-tool="reddit-user">Reddit</button>
+                <button class="tool-tab" data-tool="cf">Codice Fiscale</button>
+              </div>
+
+              <div class="tool-form">
+                <input type="text" id="toolInput" class="search-input" placeholder="es. example.com">
+                <button id="toolRunBtn" class="btn btn-primary">▶ Esegui</button>
+              </div>
+              <div class="tool-hint" id="toolHint">Inserisci un dominio (es. <code>example.com</code>)</div>
+
+              <div id="toolResult" class="tool-result hidden"></div>
+            </div>
+          </section>
+
+          <!-- Generator -->
+          <section id="generatorSection" class="section hidden">
+            <h2>Generatore Wordlist</h2>
+
+            <div class="generator-panel">
+              <div class="level-selector">
+                <label>
+                  <input type="radio" name="level" value="easy" checked>
+                  <span class="level-label">Easy</span>
+                  <span class="level-desc">base + anni</span>
+                </label>
+                <label>
+                  <input type="radio" name="level" value="medium">
+                  <span class="level-label">Medium</span>
+                  <span class="level-desc">+ leet + combo</span>
+                </label>
+                <label>
+                  <input type="radio" name="level" value="hard">
+                  <span class="level-label">Hard</span>
+                  <span class="level-desc">+ tutte le varianti</span>
+                </label>
+              </div>
+
+              <div class="manual-keys">
+                <label>Aggiungi parole chiave (comma-separated):</label>
+                <textarea id="manualKeysInput" placeholder="es: gatto, rosso, 1234"></textarea>
+              </div>
+
+              <!-- ── Mutazioni avanzate ──────────────────────────────── -->
+              <div class="mutation-options">
+                <h3 class="mutation-title">⚙️ Mutazioni avanzate</h3>
+                <div class="mutation-row">
+                  <label class="mutation-label">Leet speak:</label>
+                  <select id="leetLevelSelect" class="mutation-select">
+                    <option value="auto" selected>Auto (segue il livello)</option>
+                    <option value="off">Off (no leet)</option>
+                    <option value="base">Base (a→4, e→3, i→1, o→0)</option>
+                    <option value="advanced">Avanzato (+ @, $, +, 9, 8)</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- ── Esclusioni ──────────────────────────────────────── -->
+              <div class="exclusion-options">
+                <h3 class="exclusion-title">🚫 Esclusioni</h3>
+                <label class="exclusion-checkbox">
+                  <input type="checkbox" id="excludeCommonCheck" checked>
+                  Escludi password top comuni (rockyou: password, qwerty, 123456...)
+                </label>
+                <details class="exclusion-custom">
+                  <summary>+ Wordlist personale di esclusione</summary>
+                  <p class="hint">Una password per riga. Le password risultanti che corrispondono esattamente a queste verranno scartate.</p>
+                  <textarea id="excludeExtraInput" placeholder="es:&#10;mario1990&#10;ciao123&#10;pippo!"></textarea>
+                  <div class="exclusion-status" id="excludeStatus"></div>
+                </details>
+              </div>
+
+              <!-- ── Riepilogo features (Smart Wizard) ──────────────── -->
+              <div class="features-summary" id="featuresSummary">
+                <div class="summary-header">
+                  <h3>📋 Riepilogo features</h3>
+                  <button class="summary-toggle" id="summaryToggleBtn" title="Espandi/comprimi">▾</button>
+                </div>
+                <div class="summary-body" id="summaryBody">
+                  <div class="summary-rows" id="summaryRows"></div>
+                  <div class="summary-settings" id="summarySettings"></div>
+                </div>
+              </div>
+
+              <!-- Live counter (Task #5) -->
+              <div class="live-counter">
+                <span class="counter-label">📊 Verranno generate circa:</span>
+                <span class="counter-value" id="liveCounter">-</span>
+                <span class="counter-suffix">password</span>
+              </div>
+
+              <button id="generateBtn" class="btn btn-primary">Genera Wordlist</button>
+            </div>
+          </section>
+
+          <!-- Output -->
+          <section id="outputSection" class="section hidden">
+            <h2>Output Wordlist</h2>
+
+            <div class="output-info">
+              <div class="output-stat">
+                <span class="stat-label">Totale:</span>
+                <span class="stat-value" id="wordlistCount">0</span> password
+              </div>
+              <div class="output-stat">
+                <span class="stat-label">Livello:</span>
+                <span class="stat-value" id="wordlistLevel">-</span>
+              </div>
+            </div>
+
+            <div class="wordlist-preview">
+              <div class="preview-label">Preview (primi 30):</div>
+              <pre id="wordlistPreview"></pre>
+            </div>
+
+            <!-- Multi-format export (Task #7) -->
+            <div class="export-actions">
+              <button class="btn btn-success" data-format="txt">📥 Download .txt</button>
+              <button class="btn btn-secondary" data-format="hashcat">⚡ Hashcat .rule</button>
+              <button class="btn btn-secondary" data-format="john">🔓 John .rule</button>
+              <button class="btn btn-secondary" data-format="json">📊 JSON Report</button>
+            </div>
+          </section>
+
+          <!-- Stats Dashboard (Task #6) -->
+          <section id="statsSection" class="section hidden">
+            <h2>📈 Statistiche Wordlist</h2>
+
+            <div class="stats-grid">
+              <div class="stat-box">
+                <div class="stat-num" id="statTotal">0</div>
+                <div class="stat-text">Password totali</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-num" id="statAvgLength">0</div>
+                <div class="stat-text">Lunghezza media</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-num" id="statLeet">0%</div>
+                <div class="stat-text">Con leet speak</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-num" id="statSpecial">0%</div>
+                <div class="stat-text">Con caratteri speciali</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-num" id="statUpper">0%</div>
+                <div class="stat-text">Con maiuscole</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-num" id="statDigit">0%</div>
+                <div class="stat-text">Con cifre</div>
+              </div>
+            </div>
+
+            <div class="length-chart">
+              <h3>Distribuzione lunghezze</h3>
+              <div id="lengthBars"></div>
+            </div>
+          </section>
+
+          <!-- Cracking Simulation (Task #9) -->
+          <section id="crackSection" class="section hidden">
+            <h2>🔓 Cracking Simulation</h2>
+            <p class="section-desc">Testa un hash contro la wordlist generata. Solo per test/educativo.</p>
+
+            <div class="crack-form">
+              <label>
+                Tipo hash:
+                <select id="hashType">
+                  <option value="md5">MD5</option>
+                  <option value="sha1">SHA-1</option>
+                  <option value="sha256">SHA-256</option>
+                  <option value="sha512">SHA-512</option>
+                </select>
+              </label>
+
+              <label>
+                Hash da craccare (hex):
+                <textarea id="targetHash" placeholder="es: 5f4dcc3b5aa765d61d8327deb882cf99 (md5 di 'password')"></textarea>
+              </label>
+
+              <button id="crackBtn" class="btn btn-primary">🚀 Tenta crack</button>
+            </div>
+
+            <div id="crackResult" class="crack-result hidden"></div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="/static/ritual-bg.js"></script>
+  <script src="/static/toast.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

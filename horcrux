@@ -1,0 +1,331 @@
+#!/bin/bash
+################################################################################
+#                            H O R C R U X                                     #
+#                    Password Wordlist Generator                               #
+################################################################################
+
+set -uo pipefail
+
+# ── Colori (palette nera/grigio/argento) ───────────────────────────────────────
+W='\033[1;37m'      # bianco brillante
+DW='\033[0;37m'     # bianco/grigio chiaro
+G='\033[1;90m'      # grigio brillante
+DG='\033[0;90m'     # grigio scuro
+SILVER='\033[38;5;250m'   # argento
+DIM='\033[2m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+# ── Resolve symlinks ────────────────────────────────────────────────────────────
+_SCRIPT="${BASH_SOURCE[0]}"
+while [[ -L "$_SCRIPT" ]]; do
+    _SCRIPT_DIR="$(cd "$(dirname "$_SCRIPT")" && pwd)"
+    _SCRIPT="$(readlink "$_SCRIPT")"
+    [[ "$_SCRIPT" != /* ]] && _SCRIPT="$_SCRIPT_DIR/$_SCRIPT"
+done
+APP_DIR="$(cd "$(dirname "$_SCRIPT")" && pwd)"
+unset _SCRIPT _SCRIPT_DIR
+
+WEB_PY="${APP_DIR}/web_app.py"
+VENV_DIR="${APP_DIR}/.venv"
+PY="${VENV_DIR}/bin/python"
+WEB_PORT="${HORCRUX_PORT:-5100}"
+WEB_PID_FILE="/tmp/.horcrux_web.pid"
+WEB_LOG="/tmp/.horcrux_web.log"
+INSTALL_PATH="/usr/local/bin/horcrux"
+
+# ── Log helpers ────────────────────────────────────────────────────────────────
+info()  { echo -e "${W}[${SILVER}★${W}]${NC} $*"; }
+ok()    { echo -e "${W}[${SILVER}✓${W}]${NC} $*"; }
+warn()  { echo -e "${W}[${G}!${W}]${NC} $*"; }
+die()   { echo -e "${SILVER}[✗]${NC} $*" >&2; cleanup; exit 1; }
+
+CLI_MODE=0
+PORT_EXPLICIT=0
+
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --port)            WEB_PORT="$2"; PORT_EXPLICIT=1; shift 2 ;;
+            --install-global)  CLI_MODE=1; do_install_global; exit 0 ;;
+            -h|--help)         CLI_MODE=1; show_help; exit 0 ;;
+            *)                 die "argomento sconosciuto: $1" ;;
+        esac
+    done
+    [[ -n "${HORCRUX_PORT:-}" ]] && PORT_EXPLICIT=1
+}
+
+show_help() {
+    cat << EOF
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║      HORCRUX · Password Wordlist Generator from Chat Archives             ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+USAGE:
+  horcrux [OPTIONS]
+
+OPTIONS:
+  --port N            porta del server web (default 5100)
+  --install-global    crea symlink in ${INSTALL_PATH} (richiede sudo)
+  -h, --help          mostra questo messaggio
+
+VARIABILI D'AMBIENTE:
+  HORCRUX_PORT          porta del server web
+  HORCRUX_MIHAWK_DIR    cartella root di Mihawk (auto-rilevata)
+  HORCRUX_USER          username login web (default toji)
+  HORCRUX_PASS          password login web (default lilliv)
+  HORCRUX_SECRET        chiave sessioni Flask
+
+EOF
+}
+
+do_install_global() {
+    if [[ -L "${INSTALL_PATH}" ]] && [[ "$(readlink "${INSTALL_PATH}")" == "${APP_DIR}/horcrux" ]]; then
+        ok "già installato: ${INSTALL_PATH}"
+        return
+    fi
+    info "creo symlink globale ${INSTALL_PATH} → ${APP_DIR}/horcrux"
+    if sudo ln -sf "${APP_DIR}/horcrux" "${INSTALL_PATH}" 2>/dev/null; then
+        ok "✓ ora puoi lanciare 'horcrux' da qualunque cartella"
+    else
+        warn "sudo non disponibile. Comando manuale:"
+        echo -e "  ${DG}sudo ln -sf ${APP_DIR}/horcrux ${INSTALL_PATH}${NC}"
+    fi
+}
+
+setup_port() {
+    if [[ ${CLI_MODE} -eq 1 ]] || [[ ${PORT_EXPLICIT} -eq 1 ]]; then
+        return
+    fi
+    echo ""
+    read -rp "  Porta per web app (default 5100): " port_input
+    if [[ -z "$port_input" ]]; then
+        WEB_PORT=5100
+        return
+    fi
+    if ! [[ "$port_input" =~ ^[0-9]+$ ]] || (( port_input < 1024 )) || (( port_input > 65535 )); then
+        warn "porta non valida, uso 5100"
+        WEB_PORT=5100
+    else
+        WEB_PORT=$port_input
+    fi
+}
+
+show_title() {
+    clear
+    echo ""
+    echo -e "${SILVER}"
+    cat << 'EOF'
+ ██╗  ██╗ ██████╗ ██████╗  ██████╗██████╗ ██╗   ██╗██╗  ██╗
+ ██║  ██║██╔═══██╗██╔══██╗██╔════╝██╔══██╗██║   ██║╚██╗██╔╝
+ ███████║██║   ██║██████╔╝██║     ██████╔╝██║   ██║ ╚███╔╝
+ ██╔══██║██║   ██║██╔══██╗██║     ██╔══██╗██║   ██║ ██╔██╗
+ ██║  ██║╚██████╔╝██║  ██║╚██████╗██║  ██║╚██████╔╝██╔╝ ██╗
+ ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝
+EOF
+    echo -e "${NC}"
+    echo -e "${DG}                « il frammento dell'anima »${NC}"
+    echo -e "${G}                       by virus212${NC}"
+    echo ""
+}
+
+boot_sequence() {
+    local bar_width=38
+    local total=50
+    local delay=0.04
+
+    local msgs=(
+        "Sigillo del frammento"
+        "Lettura archivi"
+        "Estrazione anime"
+        "Costruzione profilo"
+        "Forgiatura mutazioni"
+        "Horcrux pronto"
+    )
+    local msg_at=(1 10 20 30 40 48)
+    local current_msg="${msgs[0]}"
+
+    local i j m filled empty pct bar
+    for ((i=0; i<=total; i++)); do
+        for ((m=0; m<${#msg_at[@]}; m++)); do
+            if (( i == msg_at[m] )); then
+                current_msg="${msgs[m]}"
+            fi
+        done
+
+        filled=$(( i * bar_width / total ))
+        empty=$(( bar_width - filled ))
+        pct=$(( i * 100 / total ))
+
+        bar=""
+        for ((j=0; j<filled; j++)); do bar+="█"; done
+        for ((j=0; j<empty; j++)); do bar+="░"; done
+
+        printf "\r  ${SILVER}[${W}%s${SILVER}]${NC} ${W}%3d%%${NC}  ${DG}%-40s${NC}" \
+               "$bar" "$pct" "$current_msg"
+
+        sleep "$delay"
+    done
+    printf "\r  ${SILVER}[${W}%s${SILVER}]${NC} ${W}100%%${NC}  ${SILVER}%-40s${NC}\n" \
+           "$(printf '█%.0s' $(seq 1 $bar_width))" "✓ Frammento risvegliato"
+    echo ""
+}
+
+_pid_is_our_server() {
+    local pid="$1"
+    [[ -z "${pid}" ]] && return 1
+    kill -0 "${pid}" 2>/dev/null || return 1
+    ps -p "${pid}" -o args= 2>/dev/null | grep -q "web_app.py"
+}
+
+cleanup() {
+    trap - EXIT INT TERM
+    if [[ ${CLI_MODE} -eq 1 ]]; then
+        return
+    fi
+    tput cnorm >/dev/null 2>&1 || true
+    if [[ -f "${WEB_PID_FILE}" ]]; then
+        local pid
+        pid=$(cat "${WEB_PID_FILE}" 2>/dev/null || true)
+        if _pid_is_our_server "${pid}"; then
+            kill "${pid}" 2>/dev/null || true
+            local n=0
+            while kill -0 "${pid}" 2>/dev/null && (( n < 10 )); do
+                sleep 0.2
+                n=$((n+1))
+            done
+            kill -0 "${pid}" 2>/dev/null && kill -9 "${pid}" 2>/dev/null || true
+            echo ""
+            echo -e "${SILVER}  ◈ Horcrux distrutto. Server terminato (PID ${pid}). ◈${NC}"
+        fi
+        rm -f "${WEB_PID_FILE}"
+    fi
+}
+trap cleanup EXIT INT TERM
+
+check_deps() {
+    info "Controllo dipendenze…"
+
+    command -v python3 &>/dev/null || die "python3 non trovato"
+    ok "python3: $(python3 --version 2>&1)"
+
+    if [[ ! -x "${PY}" ]]; then
+        warn "virtualenv non trovato — lo creo"
+        if ! python3 -m venv "${VENV_DIR}" 2>/dev/null; then
+            warn "installo python3-venv (sudo)"
+            sudo apt-get install -y python3-venv -qq 2>/dev/null || \
+                die "impossibile installare python3-venv"
+            python3 -m venv "${VENV_DIR}" || die "creazione venv fallita"
+        fi
+        "${PY}" -m pip install -q --upgrade pip >/dev/null 2>&1 || true
+        ok "venv creato"
+    fi
+
+    if ! "${PY}" -c "import flask" 2>/dev/null; then
+        warn "dipendenze mancanti — installo…"
+        "${PY}" -m pip install -q -r "${APP_DIR}/requirements.txt" || die "pip install fallito"
+        ok "Flask installato"
+    else
+        local fv
+        fv=$("${PY}" -c "import flask; print(flask.__version__)" 2>/dev/null)
+        ok "Flask ${fv}"
+    fi
+
+    echo ""
+}
+
+start_web() {
+    info "Risveglio del server sulla porta ${WEB_PORT}…"
+
+    if [[ -f "${WEB_PID_FILE}" ]]; then
+        local OLD_PID
+        OLD_PID=$(cat "${WEB_PID_FILE}" 2>/dev/null || echo)
+        if [[ -n "${OLD_PID}" ]] && kill -0 "${OLD_PID}" 2>/dev/null; then
+            warn "istanza precedente attiva (PID ${OLD_PID}) — riutilizzo"
+            ok "server già in ascolto su http://localhost:${WEB_PORT}"
+            return
+        fi
+        rm -f "${WEB_PID_FILE}"
+    fi
+
+    HORCRUX_PORT="${WEB_PORT}" nohup "${PY}" "${WEB_PY}" > "${WEB_LOG}" 2>&1 &
+    echo $! > "${WEB_PID_FILE}"
+    local pid=$!
+
+    local waited=0
+    while (( waited < 16 )); do
+        if curl -s "http://localhost:${WEB_PORT}/login" &>/dev/null; then
+            ok "server attivo → http://localhost:${WEB_PORT}  (PID ${pid})"
+            return
+        fi
+        sleep 0.5
+        waited=$((waited+1))
+    done
+
+    if kill -0 "${pid}" 2>/dev/null; then
+        warn "server avviato ma non risponde ancora"
+    else
+        die "server fallito — vedi ${WEB_LOG}"
+    fi
+}
+
+open_browser() {
+    local url="http://localhost:${WEB_PORT}"
+    if command -v xdg-open &>/dev/null; then
+        xdg-open "${url}" &>/dev/null &
+        ok "browser aperto su ${url}"
+    elif command -v open &>/dev/null; then
+        open "${url}" &
+        ok "browser aperto su ${url}"
+    else
+        warn "apri manualmente: ${url}"
+    fi
+}
+
+watch_loop() {
+    tput civis 2>/dev/null || true
+
+    local glyphs=("◇" "◈" "⬥" "◎" "⟁" "✶" "◬" "⊹")
+    local spin=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
+    local n_g=${#glyphs[@]}
+    local n_sp=${#spin[@]}
+
+    echo ""
+    echo -e "${SILVER}                      ╔══════════════════════════════════════════════════╗${NC}"
+    echo -e "${SILVER}                      ║${W}    Server attivo · CTRL+C per chiudere tutto     ${SILVER}║${NC}"
+    echo -e "${SILVER}                      ╚══════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo ""
+    echo ""
+
+    local i=0
+    local sl ml mr g1 g2 ts
+    while true; do
+        sl="${glyphs[$((i % n_g))]}"
+        ml="${glyphs[$(((i+1) % n_g))]}"
+        mr="${glyphs[$(((i+3) % n_g))]}"
+        g1="${glyphs[$(((i+2) % n_g))]}"
+        g2="${glyphs[$(((i+4) % n_g))]}"
+        ts="${spin[$((i % n_sp))]}"
+
+        printf "\033[3A"
+        printf "\033[K                              ${DG}http://localhost:${WEB_PORT}${NC}     ${DIM}$(date +%H:%M:%S)${NC}\n"
+        printf "\033[K                                    ${W}${ts}${NC}  ${SILVER}${sl}${NC}  ${W}${g1}${NC}   ${SILVER}${ml}${NC}   ${W}${g2}${NC}   ${SILVER}${mr}${NC}\n"
+        printf "\033[K\n"
+
+        sleep 0.25
+        i=$((i+1))
+    done
+}
+
+# ── Entry point ────────────────────────────────────────────────────────────────
+parse_args "$@"
+
+show_title
+boot_sequence
+check_deps
+setup_port
+start_web
+open_browser
+watch_loop

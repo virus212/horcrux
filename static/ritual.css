@@ -1,0 +1,791 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   HORCRUX · RITUAL DARK
+   Override layer per dare alla UI un'estetica esoterica/alchemica.
+   Tema nero/grigio/argento con glifi animati, sigilli, nebbia.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --mist: rgba(192, 192, 192, 0.04);
+  --mist-strong: rgba(232, 232, 232, 0.08);
+  --rune: #b0b0b0;
+  --rune-bright: #e8e8e8;
+  --rune-dim: #555;
+  --glow-soft: 0 0 8px rgba(192, 192, 192, 0.25);
+  --glow-mid: 0 0 14px rgba(192, 192, 192, 0.45);
+  --glow-strong: 0 0 22px rgba(232, 232, 232, 0.7);
+  --sigil-border: 1px solid rgba(192, 192, 192, 0.18);
+}
+
+/* ── Body: nebbia di sfondo + vignette ────────────────────────────────────── */
+body {
+  background:
+    radial-gradient(ellipse at 50% 30%, var(--mist) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 90%, var(--mist) 0%, transparent 60%),
+    linear-gradient(135deg, #050505 0%, #0a0a0a 50%, #060606 100%) !important;
+  background-attachment: fixed;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Vignette overlay */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.4) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ── Dynamic ritual runes (spawned by ritual-bg.js) ───────────────────────── */
+.ritual-bg-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.ritual-rune {
+  position: fixed;
+  user-select: none;
+  pointer-events: none;
+  font-family: serif;
+  display: block;
+  will-change: transform, opacity;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+/* 4 path types */
+.ritual-rune.drift-up {
+  animation-name: drift-up;
+}
+.ritual-rune.drift-diagonal {
+  animation-name: drift-diagonal;
+}
+.ritual-rune.drift-spiral {
+  animation-name: drift-spiral;
+}
+.ritual-rune.drift-side {
+  animation-name: drift-side;
+}
+
+@keyframes drift-up {
+  0%   { transform: translateY(0) rotate(0deg); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 0.8; }
+  100% { transform: translateY(-180vh) rotate(360deg); opacity: 0; }
+}
+
+@keyframes drift-diagonal {
+  0%   { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 0.7; }
+  100% { transform: translate(-30vw, -160vh) rotate(540deg); opacity: 0; }
+}
+
+@keyframes drift-spiral {
+  0%   { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  10%  { opacity: 0.9; }
+  25%  { transform: translate(40px, -25vh) rotate(180deg); }
+  50%  { transform: translate(-30px, -50vh) rotate(360deg); }
+  75%  { transform: translate(20px, -100vh) rotate(540deg); }
+  90%  { opacity: 0.5; }
+  100% { transform: translate(0, -160vh) rotate(720deg); opacity: 0; }
+}
+
+@keyframes drift-side {
+  0%   { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  10%  { opacity: 1; }
+  20%  { transform: translate(60px, -10vh) rotate(90deg); }
+  40%  { transform: translate(-40px, -40vh) rotate(180deg); }
+  60%  { transform: translate(70px, -80vh) rotate(270deg); }
+  80%  { transform: translate(-20px, -120vh) rotate(360deg); }
+  90%  { opacity: 0.5; }
+  100% { transform: translate(0, -170vh) rotate(450deg); opacity: 0; }
+}
+
+/* ── Big background sigil ring (decorative) ───────────────────────────────── */
+.ritual-sigil-ring {
+  position: fixed;
+  width: 800px;
+  height: 800px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.08;
+  filter: blur(0.5px);
+}
+
+/* ── Login page: meno rumore visivo ────────────────────────────────────────── */
+.login-page .ritual-rune {
+  opacity: 0.35 !important;
+  font-size: 14px !important;
+}
+
+.login-page .ritual-sigil-ring {
+  opacity: 0.05;
+}
+
+.login-page .sigil-glyphs span {
+  font-size: 16px !important;
+  text-shadow: 0 0 8px rgba(192, 192, 192, 0.4) !important;
+}
+
+.sigil-circle {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(192, 192, 192, 0.4);
+  border-radius: 50%;
+}
+
+.sigil-circle.outer {
+  animation: sigilRotate 90s linear infinite;
+  border-style: dashed;
+}
+
+.sigil-circle.middle {
+  inset: 60px;
+  animation: sigilRotate 60s linear infinite reverse;
+}
+
+.sigil-circle.inner {
+  inset: 140px;
+  animation: sigilRotate 40s linear infinite;
+  border-style: dotted;
+}
+
+@keyframes sigilRotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.sigil-glyphs {
+  position: absolute;
+  inset: 0;
+  animation: sigilRotate 120s linear infinite reverse;
+}
+
+.sigil-glyphs span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  font-size: 22px;
+  color: rgba(232, 232, 232, 0.4);
+  text-shadow: 0 0 12px rgba(192, 192, 192, 0.6);
+  transform-origin: 0 0;
+  /* Position 8 symbols in circle */
+  --angle: calc(var(--i) * 45deg);
+  transform: rotate(var(--angle)) translate(380px) rotate(calc(-1 * var(--angle)));
+}
+
+.app-container,
+.wizard-container,
+.login-container {
+  position: relative;
+  z-index: 2;
+}
+
+/* ── Header: bordi rituali ─────────────────────────────────────────────────── */
+.app-header {
+  background: linear-gradient(180deg,
+    rgba(20, 20, 20, 0.95),
+    rgba(10, 10, 10, 0.85)) !important;
+  backdrop-filter: blur(8px);
+  border-bottom: var(--sigil-border) !important;
+  position: relative;
+}
+
+/* Glyphs decorativi rimossi (collidevano con i pulsanti dell'header) */
+@keyframes glyphFlicker {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50%      { opacity: 0.85; transform: scale(1.15); }
+}
+
+.header-title {
+  text-shadow: var(--glow-soft);
+  letter-spacing: 4px !important;
+}
+
+.title-amber {
+  text-shadow: var(--glow-mid);
+  animation: glyphBreath 3s ease-in-out infinite;
+}
+
+@keyframes glyphBreath {
+  0%, 100% { opacity: 0.7; }
+  50%      { opacity: 1; text-shadow: var(--glow-strong); }
+}
+
+/* ── Sezioni: corner glyphs ───────────────────────────────────────────────── */
+.section {
+  position: relative;
+  background: linear-gradient(135deg,
+    rgba(14, 14, 14, 0.95),
+    rgba(20, 20, 20, 0.85)) !important;
+  border: var(--sigil-border) !important;
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.4);
+  transition: box-shadow 0.4s, border-color 0.4s;
+}
+
+.section:hover {
+  border-color: rgba(192, 192, 192, 0.3) !important;
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.3),
+              0 0 16px rgba(192, 192, 192, 0.08);
+}
+
+/* Corner glyphs su section */
+.section::before,
+.section::after {
+  content: "◇";
+  position: absolute;
+  font-size: 11px;
+  color: var(--rune);
+  opacity: 0.35;
+  transition: opacity 0.4s;
+  pointer-events: none;
+}
+
+.section::before { top: 6px; left: 8px; }
+.section::after  { bottom: 6px; right: 8px; }
+
+.section:hover::before,
+.section:hover::after {
+  opacity: 0.85;
+  text-shadow: var(--glow-soft);
+}
+
+/* H2 con sigilli laterali */
+.section h2 {
+  position: relative;
+  display: inline-block;
+  padding: 0 24px;
+  margin-bottom: 18px !important;
+  text-transform: uppercase;
+  letter-spacing: 2px !important;
+  color: var(--rune-bright) !important;
+  text-shadow: var(--glow-soft);
+}
+
+.section h2::before,
+.section h2::after {
+  content: "✦";
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 9px;
+  color: var(--rune);
+  opacity: 0.6;
+}
+
+.section h2::before { left: 0; }
+.section h2::after  { right: 0; animation: revolve 6s linear infinite; }
+
+@keyframes revolve {
+  from { transform: translateY(-50%) rotate(0deg); }
+  to   { transform: translateY(-50%) rotate(360deg); }
+}
+
+/* ── Sidebar runico ───────────────────────────────────────────────────────── */
+.sidebar {
+  background: linear-gradient(180deg,
+    rgba(14, 14, 14, 0.95),
+    rgba(8, 8, 8, 0.9)) !important;
+  border-right: var(--sigil-border) !important;
+}
+
+.sidebar-header {
+  position: relative;
+  padding: 8px 0;
+  text-align: center;
+  letter-spacing: 4px !important;
+  color: var(--rune-bright) !important;
+}
+
+.sidebar-header::before {
+  content: "◇ ◆ ◇";
+  display: block;
+  font-size: 8px;
+  margin-bottom: 4px;
+  color: var(--rune);
+  opacity: 0.5;
+  letter-spacing: 8px;
+}
+
+.channel-item {
+  border-left: 2px solid transparent !important;
+  background: transparent !important;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.channel-item::before {
+  content: "›";
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--rune);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.channel-item:hover {
+  background: rgba(192, 192, 192, 0.06) !important;
+  border-left-color: var(--rune) !important;
+  padding-left: 18px;
+}
+
+.channel-item:hover::before {
+  opacity: 1;
+}
+
+.channel-item.active {
+  background: linear-gradient(90deg,
+    rgba(192, 192, 192, 0.12),
+    transparent) !important;
+  border-left-color: var(--rune-bright) !important;
+  box-shadow: inset 0 0 20px rgba(192, 192, 192, 0.05);
+}
+
+.channel-item.active::before {
+  content: "◆";
+  opacity: 1;
+  text-shadow: var(--glow-soft);
+}
+
+/* ── Buttons: rituale ─────────────────────────────────────────────────────── */
+.btn {
+  background: linear-gradient(180deg, #1a1a1a, #0e0e0e) !important;
+  border: 1px solid rgba(192, 192, 192, 0.2) !important;
+  color: var(--rune) !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase;
+  font-size: 11px !important;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(192, 192, 192, 0.15), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.btn:hover {
+  border-color: var(--rune-bright) !important;
+  color: var(--rune-bright) !important;
+  text-shadow: var(--glow-soft);
+  box-shadow: var(--glow-mid);
+}
+
+.btn:hover::before {
+  opacity: 1;
+}
+
+.btn-primary {
+  background: linear-gradient(180deg, #2a2a2a, #1a1a1a) !important;
+  border-color: var(--rune-bright) !important;
+  color: var(--rune-bright) !important;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(180deg, #3a3a3a, #2a2a2a) !important;
+  box-shadow: var(--glow-strong);
+  animation: btnPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes btnPulse {
+  0%, 100% { box-shadow: 0 0 12px rgba(192, 192, 192, 0.4); }
+  50%      { box-shadow: 0 0 24px rgba(232, 232, 232, 0.7); }
+}
+
+.btn-success {
+  background: linear-gradient(180deg, #1a2820, #0e180e) !important;
+  border-color: rgba(39, 174, 96, 0.6) !important;
+  color: #2ecc71 !important;
+}
+
+.btn-success:hover {
+  box-shadow: 0 0 20px rgba(39, 174, 96, 0.6);
+}
+
+/* ── Tags: rune-style ─────────────────────────────────────────────────────── */
+.tag {
+  background: linear-gradient(180deg, #141414, #0a0a0a) !important;
+  border: 1px solid rgba(192, 192, 192, 0.15) !important;
+  color: var(--text) !important;
+  transition: all 0.25s ease;
+}
+
+.tag:hover {
+  border-color: var(--rune) !important;
+  text-shadow: var(--glow-soft);
+}
+
+/* ── Topic badges → sigilli ───────────────────────────────────────────────── */
+.topic-badge {
+  background: linear-gradient(135deg,
+    rgba(192, 192, 192, 0.18),
+    rgba(80, 80, 80, 0.3)) !important;
+  border: 1px solid rgba(232, 232, 232, 0.35);
+  color: var(--rune-bright) !important;
+  text-shadow: var(--glow-soft);
+  position: relative;
+  letter-spacing: 1px !important;
+  text-transform: uppercase;
+  font-size: 11px !important;
+}
+
+.topic-badge::before {
+  content: "✦";
+  margin-right: 6px;
+  color: var(--rune);
+  animation: glyphBreath 2s ease-in-out infinite;
+}
+
+/* ── Inputs: rituale ──────────────────────────────────────────────────────── */
+.add-tag-input,
+.search-input,
+.manual-keys textarea,
+.crack-form select,
+.crack-form textarea,
+.step-input,
+.osint-field input {
+  background: linear-gradient(180deg, #0a0a0a, #050505) !important;
+  border: 1px solid rgba(192, 192, 192, 0.15) !important;
+  transition: all 0.3s ease;
+}
+
+.add-tag-input:focus,
+.search-input:focus,
+.manual-keys textarea:focus,
+.crack-form select:focus,
+.crack-form textarea:focus,
+.step-input:focus,
+.osint-field input:focus {
+  border-color: var(--rune-bright) !important;
+  box-shadow: 0 0 0 1px rgba(192, 192, 192, 0.15), var(--glow-soft) !important;
+  background: linear-gradient(180deg, #141414, #0a0a0a) !important;
+}
+
+/* ── Live counter: glow ───────────────────────────────────────────────────── */
+.live-counter {
+  background: linear-gradient(180deg, #141414, #080808) !important;
+  border: 1px solid rgba(192, 192, 192, 0.25) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.live-counter::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgba(192, 192, 192, 0.05), transparent);
+  pointer-events: none;
+}
+
+.counter-value {
+  text-shadow: var(--glow-mid);
+  animation: glyphBreath 2s ease-in-out infinite;
+}
+
+/* ── Wordlist preview (output) ────────────────────────────────────────────── */
+.wordlist-preview pre {
+  background: linear-gradient(180deg, #0a0a0a, #050505) !important;
+  border: 1px solid rgba(192, 192, 192, 0.1);
+  text-shadow: var(--glow-soft);
+}
+
+/* ── Toast pergamena ──────────────────────────────────────────────────────── */
+.toast {
+  background: linear-gradient(135deg,
+    rgba(20, 20, 20, 0.98),
+    rgba(10, 10, 10, 0.95)) !important;
+  border: 1px solid rgba(192, 192, 192, 0.3) !important;
+  border-left-width: 3px !important;
+  backdrop-filter: blur(8px);
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.7),
+    inset 0 0 12px rgba(192, 192, 192, 0.05);
+  letter-spacing: 0.5px;
+}
+
+.toast.success { border-left-color: #2ecc71 !important; }
+.toast.error   { border-left-color: #e74c3c !important; }
+.toast.warning { border-left-color: #f39c12 !important; }
+.toast.info    { border-left-color: var(--rune-bright) !important; }
+
+/* ── Login page: rituale ───────────────────────────────────────────────────── */
+.login-page {
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(192, 192, 192, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 70%, rgba(80, 80, 80, 0.05) 0%, transparent 50%),
+    #050505 !important;
+}
+
+.login-container {
+  animation: ritualEntry 1s ease-out;
+}
+
+@keyframes ritualEntry {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+}
+
+/* Stemma login: animazione gestita inline nel template (più dolce) */
+
+/* Cerchio runico intorno al login */
+.login-container::before {
+  content: "✦  ◇  ⬥  ⊹  ✶  ◬  ⊕  ❖";
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  letter-spacing: 14px;
+  color: rgba(192, 192, 192, 0.25);
+  white-space: nowrap;
+}
+
+.login-container {
+  position: relative;
+}
+
+.login-form button {
+  background: linear-gradient(180deg, #2a2a2a, #1a1a1a) !important;
+  border: 1px solid rgba(192, 192, 192, 0.4) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.login-form button::after {
+  content: "◇";
+  margin-left: 12px;
+  display: inline-block;
+  animation: revolve 4s linear infinite;
+}
+
+.login-form button:hover {
+  background: linear-gradient(180deg, #3a3a3a, #2a2a2a) !important;
+  box-shadow: var(--glow-strong);
+}
+
+/* ── Wizard: ritualistic ───────────────────────────────────────────────────── */
+.wizard-progress-bar {
+  background: linear-gradient(180deg, #050505, #0e0e0e) !important;
+  border-bottom: var(--sigil-border) !important;
+}
+
+.wizard-progress-fill {
+  background: linear-gradient(90deg,
+    rgba(192, 192, 192, 0.2),
+    rgba(232, 232, 232, 0.4),
+    rgba(192, 192, 192, 0.2)) !important;
+  box-shadow: 0 0 12px rgba(192, 192, 192, 0.4);
+}
+
+.step-icon {
+  filter: grayscale(0.4) drop-shadow(0 0 16px rgba(192, 192, 192, 0.3)) !important;
+  animation: stepIconBreath 3s ease-in-out infinite;
+}
+
+@keyframes stepIconBreath {
+  0%, 100% {
+    filter: grayscale(0.4) drop-shadow(0 0 12px rgba(192, 192, 192, 0.3));
+    transform: translateY(0);
+  }
+  50% {
+    filter: grayscale(0.2) drop-shadow(0 0 24px rgba(232, 232, 232, 0.6));
+    transform: translateY(-3px);
+  }
+}
+
+.step-title {
+  text-shadow: var(--glow-soft);
+  letter-spacing: 2px !important;
+}
+
+.step-title::before,
+.step-title::after {
+  content: "✦";
+  display: inline-block;
+  margin: 0 16px;
+  font-size: 12px;
+  color: var(--rune);
+  opacity: 0.6;
+  vertical-align: middle;
+}
+
+/* ── OSINT modal: invocazione ─────────────────────────────────────────────── */
+.osint-modal {
+  background: rgba(0, 0, 0, 0.92) !important;
+  backdrop-filter: blur(12px);
+}
+
+.osint-modal-content {
+  background: linear-gradient(135deg,
+    rgba(20, 20, 20, 0.98),
+    rgba(10, 10, 10, 0.95)) !important;
+  border: 1px solid rgba(192, 192, 192, 0.4) !important;
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.8),
+    inset 0 0 60px rgba(192, 192, 192, 0.04),
+    var(--glow-mid) !important;
+}
+
+.osint-modal-header h2 {
+  text-shadow: var(--glow-soft);
+  position: relative;
+  padding: 0 32px;
+  display: inline-block;
+}
+
+.osint-modal-header h2::before,
+.osint-modal-header h2::after {
+  content: "◆";
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: var(--rune);
+  animation: glyphFlicker 3s ease-in-out infinite;
+}
+
+.osint-modal-header h2::before { left: 0; }
+.osint-modal-header h2::after  { right: 0; animation-delay: 1.5s; }
+
+/* ── Tools tabs: rituale ──────────────────────────────────────────────────── */
+.tools-tabs {
+  background: linear-gradient(180deg, #0a0a0a, #050505) !important;
+  border: var(--sigil-border) !important;
+}
+
+.tool-tab {
+  letter-spacing: 1.5px !important;
+  text-transform: uppercase;
+}
+
+.tool-tab.active {
+  background: linear-gradient(180deg, #1a1a1a, #0e0e0e) !important;
+  border-color: rgba(192, 192, 192, 0.4) !important;
+  box-shadow: var(--glow-soft);
+}
+
+/* ── Loading spinner runico (override) ────────────────────────────────────── */
+.spinner {
+  position: relative;
+  letter-spacing: 8px;
+}
+
+.spinner::before {
+  content: "✦ ◇ ⬥";
+  display: block;
+  text-align: center;
+  font-size: 16px;
+  margin-bottom: 8px;
+  color: var(--rune);
+  animation: revolve 2s linear infinite;
+}
+
+/* ── Multi-channel banner: glow ───────────────────────────────────────────── */
+.multi-banner {
+  background: linear-gradient(135deg,
+    rgba(192, 192, 192, 0.06),
+    rgba(80, 80, 80, 0.1)) !important;
+  border: 1px solid rgba(192, 192, 192, 0.3) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.multi-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at top, rgba(192, 192, 192, 0.1), transparent 60%);
+  pointer-events: none;
+}
+
+/* ── Stats boxes: cards ritualistiche ─────────────────────────────────────── */
+.stat-box {
+  background: linear-gradient(180deg, #141414, #080808) !important;
+  border: 1px solid rgba(192, 192, 192, 0.18) !important;
+  transition: all 0.3s ease;
+}
+
+.stat-box:hover {
+  border-color: rgba(192, 192, 192, 0.4) !important;
+  box-shadow: var(--glow-soft);
+  transform: translateY(-2px);
+}
+
+.stat-num {
+  text-shadow: var(--glow-soft);
+}
+
+/* ── Cracking section: occulto ────────────────────────────────────────────── */
+.crack-result.success {
+  background: linear-gradient(135deg,
+    rgba(39, 174, 96, 0.12),
+    rgba(20, 60, 30, 0.2)) !important;
+  border: 1px solid rgba(46, 204, 113, 0.5) !important;
+  box-shadow: 0 0 20px rgba(46, 204, 113, 0.2);
+}
+
+.crack-result.failure {
+  background: linear-gradient(135deg,
+    rgba(192, 57, 43, 0.1),
+    rgba(50, 20, 20, 0.2)) !important;
+  border: 1px solid rgba(231, 76, 60, 0.4) !important;
+}
+
+.crack-pwd {
+  text-shadow: var(--glow-strong);
+  letter-spacing: 2px !important;
+  animation: glyphBreath 1.8s ease-in-out infinite;
+}
+
+/* ── Scrollbar: minimal ───────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px !important; }
+::-webkit-scrollbar-track { background: #050505 !important; }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #2a2a2a, #1a1a1a) !important;
+  border-radius: 3px !important;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--rune) !important;
+}
+
+/* ── Selection: glifo argento ─────────────────────────────────────────────── */
+::selection {
+  background: rgba(192, 192, 192, 0.3);
+  color: var(--rune-bright);
+  text-shadow: var(--glow-soft);
+}
+
+/* ── Reduce motion (a11y) ─────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  body::after { display: none; }
+}

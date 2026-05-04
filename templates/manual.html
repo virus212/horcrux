@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HORCRUX · Modalità Manuale</title>
+  <link rel="icon" type="image/png" href="/static/favicon.png">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/manual.css">
+  <link rel="stylesheet" href="/static/ritual.css">
+</head>
+<body class="manual-page">
+  <!-- Toast container -->
+  <div id="toastContainer"></div>
+
+  <header class="app-header">
+    <div class="header-title">
+      <a href="/" class="back-link" title="Torna alla home">←</a>
+      <img src="/static/stemma.png" alt="Horcrux" class="header-stemma">
+      <span class="title-amber">⬢</span> HORCRUX <span class="title-amber">⬢</span>
+      <span class="header-subtitle">Modalità Manuale</span>
+    </div>
+    <div class="mode-switch">
+      <button id="openOsintBtn" class="mode-link" title="Auto-fill da dati noti (CF, username, email, ecc.)">
+        🔍 OSINT Auto-fill
+      </button>
+      <a href="/logout" class="logout-btn">logout</a>
+    </div>
+  </header>
+
+  <!-- OSINT tokens banner (sempre visibile se presenti) -->
+  <div id="osintBanner" class="osint-banner hidden">
+    <span>🔬 <strong id="osintTokenCount">0</strong> token OSINT pronti per la wordlist</span>
+    <button class="osint-banner-btn" onclick="wizard.openOsintModal()">Modifica</button>
+  </div>
+
+  <!-- OSINT Auto-fill Modal -->
+  <div id="osintModal" class="osint-modal hidden">
+    <div class="osint-modal-content">
+      <div class="osint-modal-header">
+        <h2>🔍 Auto-fill da OSINT</h2>
+        <p class="osint-modal-desc">
+          Inserisci uno o più dati noti del target. Horcrux farà lookup
+          (offline + online) e pre-compilerà gli step del wizard.
+        </p>
+      </div>
+
+      <div class="osint-modal-form">
+        <div class="osint-field">
+          <label for="osintCfInput">📛 Codice Fiscale</label>
+          <input type="text" id="osintCfInput" placeholder="es. RSSMRC85A01H501Z">
+          <small>Estrae anno, sesso, comune nascita (offline)</small>
+        </div>
+
+        <div class="osint-field">
+          <label for="osintGithubInput">💻 GitHub username</label>
+          <input type="text" id="osintGithubInput" placeholder="es. mariorossi">
+          <small>Estrae nome, location, company, anno iscrizione</small>
+        </div>
+
+        <div class="osint-field">
+          <label for="osintRedditInput">👽 Reddit username</label>
+          <input type="text" id="osintRedditInput" placeholder="es. mario_rossi">
+          <small>Estrae anno iscrizione, karma</small>
+        </div>
+
+        <div class="osint-field">
+          <label for="osintEmailInput">📧 Email</label>
+          <input type="text" id="osintEmailInput" placeholder="es. marco.rossi@gmail.com">
+          <small>Pattern detection (nome.cognome, nome+anno) + provider</small>
+        </div>
+
+        <div class="osint-field">
+          <label for="osintPhoneInput">📞 Telefono</label>
+          <input type="text" id="osintPhoneInput" placeholder="es. +39 333 1234567">
+          <small>Operatore IT, paese, last digits</small>
+        </div>
+
+        <div class="osint-field">
+          <label for="osintDomainInput">🌐 Dominio o IP</label>
+          <input type="text" id="osintDomainInput" placeholder="es. example.com / 8.8.8.8">
+          <small>WHOIS + DNS + Geolocation</small>
+        </div>
+      </div>
+
+      <div class="osint-modal-actions">
+        <button class="btn btn-secondary" onclick="wizard.closeOsintModal()">Annulla</button>
+        <button class="btn btn-primary" id="osintRunBtn" onclick="wizard.runOsintLookup()">🪄 Esegui Lookup</button>
+      </div>
+
+      <!-- Results panel (shown after lookup) -->
+      <div id="osintResultsPanel" class="osint-results-panel hidden">
+        <h3>Risultati</h3>
+        <div id="osintResultsList"></div>
+
+        <div class="osint-results-summary" id="osintResultsSummary"></div>
+
+        <h4 style="margin-top:16px">✏️ Campi che verranno pre-compilati:</h4>
+        <div id="osintPrefillList"></div>
+
+        <div class="osint-modal-actions" style="margin-top: 16px;">
+          <button class="btn btn-secondary" onclick="wizard.resetOsintResults()">↻ Nuovo lookup</button>
+          <button class="btn btn-primary" onclick="wizard.applyOsintToWizard()">✓ Applica al wizard</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Progress bar -->
+  <div class="wizard-progress-bar">
+    <div class="wizard-progress-fill" id="progressFill"></div>
+    <div class="wizard-progress-text">
+      <span id="progressCurrent">1</span> / <span id="progressTotal">16</span> ·
+      <span id="progressLabel">Inizio</span>
+    </div>
+  </div>
+
+  <main class="wizard-container">
+
+    <!-- Step 0: Target identifier -->
+    <section class="wizard-step active" data-step="0" data-label="Target">
+      <div class="step-icon">🎯</div>
+      <h1 class="step-title">A chi è dedicata questa wordlist?</h1>
+      <p class="step-desc">Un identificatore per il file output. Solo per organizzazione.</p>
+      <input type="text" class="step-input" data-field="target_name"
+             placeholder="es. mario_rossi_2026" autofocus>
+      <div class="step-hint">Verrà salvato come <code>target_name.txt</code></div>
+    </section>
+
+    <!-- Step 1: Nome -->
+    <section class="wizard-step" data-step="1" data-label="Nome">
+      <div class="step-icon">👤</div>
+      <h1 class="step-title">Nome di battesimo</h1>
+      <p class="step-desc">Il nome con cui viene chiamato/a abitualmente.</p>
+      <input type="text" class="step-input" data-field="nome" placeholder="es. Marco">
+      <div class="step-hint">Esempi: Marco, Giulia, Sofia, Luca</div>
+    </section>
+
+    <!-- Step 2: Cognome -->
+    <section class="wizard-step" data-step="2" data-label="Cognome">
+      <div class="step-icon">📛</div>
+      <h1 class="step-title">Cognome</h1>
+      <p class="step-desc">Il cognome del target.</p>
+      <input type="text" class="step-input" data-field="cognome" placeholder="es. Rossi">
+      <div class="step-hint">Esempi: Rossi, Bianchi, Esposito</div>
+    </section>
+
+    <!-- Step 3: Soprannomi -->
+    <section class="wizard-step" data-step="3" data-label="Soprannomi">
+      <div class="step-icon">💕</div>
+      <h1 class="step-title">Soprannomi</h1>
+      <p class="step-desc">Come viene chiamato/a da amici, partner, famiglia.</p>
+      <textarea class="step-input step-textarea" data-field="soprannomi"
+                placeholder="es. amore, marky, biscottino"></textarea>
+      <div class="step-hint">Multipli: separa con virgola o nuova riga</div>
+    </section>
+
+    <!-- Step 4: Anno nascita -->
+    <section class="wizard-step" data-step="4" data-label="Nascita">
+      <div class="step-icon">🎂</div>
+      <h1 class="step-title">Anno di nascita</h1>
+      <p class="step-desc">Critico per le password classiche: nome+anno.</p>
+      <input type="text" class="step-input" data-field="anno_nascita" placeholder="es. 1990">
+      <div class="step-hint">L'algoritmo aggiungerà automaticamente la versione a 2 cifre (90)</div>
+    </section>
+
+    <!-- Step 5: Date importanti -->
+    <section class="wizard-step" data-step="5" data-label="Date">
+      <div class="step-icon">📅</div>
+      <h1 class="step-title">Date importanti</h1>
+      <p class="step-desc">Anniversari, eventi significativi, date memorabili.</p>
+      <textarea class="step-input step-textarea" data-field="date_importanti"
+                placeholder="es. 15/03/2010, 2018, 25122005"></textarea>
+      <div class="step-hint">Anniversari, prima volta, date di laurea, ecc.</div>
+    </section>
+
+    <!-- Step 6: Numeri -->
+    <section class="wizard-step" data-step="6" data-label="Numeri">
+      <div class="step-icon">🔢</div>
+      <h1 class="step-title">Numeri fortunati / ricorrenti</h1>
+      <p class="step-desc">Numeri preferiti, di maglietta, codici brevi.</p>
+      <textarea class="step-input step-textarea" data-field="numeri"
+                placeholder="es. 7, 23, 1234, 100"></textarea>
+      <div class="step-hint">Numeri di maglia sportiva, fortunati, codici personali</div>
+    </section>
+
+    <!-- Step 7: Telefono -->
+    <section class="wizard-step" data-step="7" data-label="Telefono">
+      <div class="step-icon">📞</div>
+      <h1 class="step-title">Numero di telefono</h1>
+      <p class="step-desc">Spesso il prefisso o le ultime cifre vengono usate.</p>
+      <input type="text" class="step-input" data-field="telefono" placeholder="es. 3331234567">
+      <div class="step-hint">L'algoritmo userà anche solo le ultime 4 e 6 cifre</div>
+    </section>
+
+    <!-- Step 8: Famiglia -->
+    <section class="wizard-step" data-step="8" data-label="Famiglia">
+      <div class="step-icon">👨‍👩‍👧</div>
+      <h1 class="step-title">Famiglia</h1>
+      <p class="step-desc">Nomi di mamma, papà, fratelli, sorelle, figli.</p>
+      <textarea class="step-input step-textarea" data-field="famiglia"
+                placeholder="es. Maria, Giovanni, Andrea, Lucia"></textarea>
+      <div class="step-hint">Anche soprannomi familiari (mamma, nonna, ecc.)</div>
+    </section>
+
+    <!-- Step 9: Partner -->
+    <section class="wizard-step" data-step="9" data-label="Partner">
+      <div class="step-icon">💞</div>
+      <h1 class="step-title">Partner / Ex</h1>
+      <p class="step-desc">Nome del/della partner attuale o del/la più importante ex.</p>
+      <textarea class="step-input step-textarea" data-field="partner"
+                placeholder="es. Giulia"></textarea>
+      <div class="step-hint">Spesso usato in combinazione con anno (es. Giulia2010)</div>
+    </section>
+
+    <!-- Step 10: Animali -->
+    <section class="wizard-step" data-step="10" data-label="Animali">
+      <div class="step-icon">🐾</div>
+      <h1 class="step-title">Animali domestici</h1>
+      <p class="step-desc">Nomi specifici di pet (cane, gatto, criceto...).</p>
+      <textarea class="step-input step-textarea" data-field="animali"
+                placeholder="es. Lilli, Gino, Rocky"></textarea>
+      <div class="step-hint">Anche soprannomi degli animali (Maialino, Pulcina)</div>
+    </section>
+
+    <!-- Step 11: Hobby -->
+    <section class="wizard-step" data-step="11" data-label="Hobby">
+      <div class="step-icon">🎨</div>
+      <h1 class="step-title">Hobby & passioni</h1>
+      <p class="step-desc">Cose che fa nel tempo libero, attività preferite.</p>
+      <textarea class="step-input step-textarea" data-field="hobby"
+                placeholder="es. tennis, fotografia, lettura, musica"></textarea>
+      <div class="step-hint">Hobby, attività, sport, interessi</div>
+    </section>
+
+    <!-- Step 12: Squadra/sport -->
+    <section class="wizard-step" data-step="12" data-label="Sport">
+      <div class="step-icon">⚽</div>
+      <h1 class="step-title">Squadra o team preferito</h1>
+      <p class="step-desc">Squadra del cuore, gruppo musicale, fandom.</p>
+      <textarea class="step-input step-textarea" data-field="squadra"
+                placeholder="es. Inter, Juventus, Lakers, BTS"></textarea>
+      <div class="step-hint">Calcio, basket, e-sport, fandom musicale</div>
+    </section>
+
+    <!-- Step 13: Brand -->
+    <section class="wizard-step" data-step="13" data-label="Brand">
+      <div class="step-icon">🏷️</div>
+      <h1 class="step-title">Brand preferiti</h1>
+      <p class="step-desc">Marche di abbigliamento, auto, gadget, app.</p>
+      <textarea class="step-input step-textarea" data-field="brands"
+                placeholder="es. Spotify, Nike, BMW, Apple"></textarea>
+      <div class="step-hint">Brand di abbigliamento, auto, tech, food</div>
+    </section>
+
+    <!-- Step 14: Luoghi -->
+    <section class="wizard-step" data-step="14" data-label="Luoghi">
+      <div class="step-icon">📍</div>
+      <h1 class="step-title">Luoghi importanti</h1>
+      <p class="step-desc">Città di nascita, residenza, vacanze ricorrenti.</p>
+      <textarea class="step-input step-textarea" data-field="luoghi"
+                placeholder="es. Milano, Roma, Parigi"></textarea>
+      <div class="step-hint">Città, paesi, mete di vacanza preferite</div>
+    </section>
+
+    <!-- Step 15: Parole speciali -->
+    <section class="wizard-step" data-step="15" data-label="Special">
+      <div class="step-icon">✨</div>
+      <h1 class="step-title">Parole speciali / inside jokes</h1>
+      <p class="step-desc">Termini personalizzati, slang, inside jokes, password "tipiche".</p>
+      <textarea class="step-input step-textarea" data-field="parole_speciali"
+                placeholder="es. topolino, miciaomicio, ciaomondo"></textarea>
+      <div class="step-hint">Qualsiasi parola che il target potrebbe usare per ragioni personali</div>
+    </section>
+
+    <!-- Step 16: Riepilogo + Generate -->
+    <section class="wizard-step" data-step="16" data-label="Genera">
+      <div class="step-icon">🎯</div>
+      <h1 class="step-title">Riepilogo & Generazione</h1>
+      <p class="step-desc">Verifica i dati raccolti e seleziona il livello di generazione.</p>
+
+      <div class="summary-box" id="summaryBox"></div>
+
+      <div class="level-selector" style="margin-top: 24px;">
+        <label>
+          <input type="radio" name="manualLevel" value="easy">
+          <span class="level-label">Easy</span>
+          <span class="level-desc">~500 password</span>
+        </label>
+        <label>
+          <input type="radio" name="manualLevel" value="medium" checked>
+          <span class="level-label">Medium</span>
+          <span class="level-desc">~2000 password</span>
+        </label>
+        <label>
+          <input type="radio" name="manualLevel" value="hard">
+          <span class="level-label">Hard</span>
+          <span class="level-desc">~10000+ password</span>
+        </label>
+      </div>
+
+      <div class="step-hint" style="margin-top: 16px;">
+        Il livello determina il numero di mutazioni applicate.
+      </div>
+    </section>
+
+    <!-- Result section (shown after generation) -->
+    <section class="wizard-result" id="resultSection">
+      <div class="step-icon">✅</div>
+      <h1 class="step-title">Wordlist generata!</h1>
+
+      <div class="result-stats">
+        <div class="result-stat">
+          <div class="stat-num" id="resultCount">0</div>
+          <div class="stat-text">Password</div>
+        </div>
+        <div class="result-stat">
+          <div class="stat-num" id="resultLevel">-</div>
+          <div class="stat-text">Livello</div>
+        </div>
+      </div>
+
+      <div class="wordlist-preview">
+        <div class="preview-label">Preview (prime 30):</div>
+        <pre id="resultPreview"></pre>
+      </div>
+
+      <div class="result-actions">
+        <button class="btn btn-success" id="downloadManualBtn">📥 Download .txt</button>
+        <button class="btn btn-secondary" id="restartBtn">🔄 Nuova wordlist</button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Navigation buttons -->
+  <nav class="wizard-nav" id="wizardNav">
+    <button class="btn btn-secondary" id="backBtn" disabled>← Indietro</button>
+    <button class="btn btn-secondary" id="skipBtn">⏭ Skip</button>
+    <button class="btn btn-primary" id="nextBtn">Avanti →</button>
+  </nav>
+
+  <script src="/static/ritual-bg.js"></script>
+  <script src="/static/toast.js"></script>
+  <script src="/static/manual.js"></script>
+</body>
+</html>

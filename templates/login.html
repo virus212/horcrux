@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HORCRUX · Login</title>
+  <link rel="icon" type="image/png" href="/static/favicon.png">
+  <link rel="stylesheet" href="/static/ritual.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #050505;
+      color: #d0d0d0;
+      font-family: 'JetBrains Mono', monospace;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .login-page {
+      background: linear-gradient(135deg, #050505 0%, #1a1a1a 100%);
+    }
+    .login-container {
+      width: 100%;
+      max-width: 700px;
+      padding: 40px;
+      text-align: center;
+    }
+    .login-ascii {
+      color: #c0c0c0;
+      font-size: 11px;
+      letter-spacing: -1px;
+      line-height: 1.1;
+      margin-bottom: 20px;
+      white-space: pre;
+      text-shadow: 0 0 8px rgba(192, 192, 192, 0.2);
+    }
+    .login-stemma {
+      width: 220px;
+      height: auto;
+      margin: 0 auto 24px;
+      display: block;
+      filter: drop-shadow(0 0 18px rgba(232, 232, 232, 0.45))
+              drop-shadow(0 0 48px rgba(192, 192, 192, 0.25));
+      /* fisso: nessuna animazione */
+    }
+    .login-motto {
+      color: #777;
+      font-size: 13px;
+      margin-bottom: 40px;
+      letter-spacing: 3px;
+      font-style: italic;
+    }
+    .login-error {
+      background: #2a1010;
+      border: 1px solid #c0392b;
+      color: #ff6b6b;
+      padding: 12px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      font-size: 13px;
+    }
+    .login-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .login-form input {
+      background: #141414;
+      border: 1px solid #2e2e2e;
+      color: #d0d0d0;
+      padding: 12px;
+      border-radius: 3px;
+      font-family: inherit;
+      font-size: 13px;
+      transition: border-color 0.2s;
+    }
+    .login-form input:focus {
+      outline: none;
+      border-color: #c0c0c0;
+      box-shadow: 0 0 0 1px rgba(192, 192, 192, 0.2);
+    }
+    .login-form button {
+      background: linear-gradient(to bottom, #2a2a2a, #1a1a1a);
+      border: 1px solid #3a3a3a;
+      color: #d0d0d0;
+      padding: 12px;
+      border-radius: 3px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 13px;
+      letter-spacing: 2px;
+      transition: all 0.2s;
+    }
+    .login-form button:hover {
+      background: linear-gradient(to bottom, #3a3a3a, #2a2a2a);
+      color: #fff;
+      border-color: #c0c0c0;
+    }
+  </style>
+</head>
+<body class="login-page">
+  <div class="login-container">
+    <img src="/static/stemma.png" alt="Horcrux" class="login-stemma">
+    <pre class="login-ascii"> ██╗  ██╗ ██████╗ ██████╗  ██████╗██████╗ ██╗   ██╗██╗  ██╗
+ ██║  ██║██╔═══██╗██╔══██╗██╔════╝██╔══██╗██║   ██║╚██╗██╔╝
+ ███████║██║   ██║██████╔╝██║     ██████╔╝██║   ██║ ╚███╔╝
+ ██╔══██║██║   ██║██╔══██╗██║     ██╔══██╗██║   ██║ ██╔██╗
+ ██║  ██║╚██████╔╝██║  ██║╚██████╗██║  ██║╚██████╔╝██╔╝ ██╗
+ ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝</pre>
+    <p class="login-motto">« il frammento dell'anima »</p>
+    {% if error %}
+    <div class="login-error">{{ error }}</div>
+    {% endif %}
+    <form method="POST" class="login-form">
+      <input type="text" name="username" placeholder="utente" required autofocus>
+      <input type="password" name="password" placeholder="password" required>
+      <button type="submit">ENTRA</button>
+    </form>
+  </div>
+  <script src="/static/ritual-bg.js"></script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+# ── Python ──
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# ── IDE / OS ──
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# ── Wordlist generate per target reali (NEVER commit privacy) ──
+manual_wordlists/*.txt
+manual_wordlists/*.json
+!manual_wordlists/.gitkeep
+!manual_wordlists/README.md
+
+# ── Profili / history Horcrux ──
+*/wordlist.txt
+*/_horcrux_history/
+*/_horcrux_profile.json
+*/_hunter_profile.json
+
+# ── Cache / runtime ──
+~/.horcrux/
+*.log
+*.pid
+
+# ── SSO token (runtime shared) ──
+.toji_sso.json
+
+# ── Local dev ──
+.env
+.env.local
+local_*
+
+# ── Claude / drafts ──
+.claude/
