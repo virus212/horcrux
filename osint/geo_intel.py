@@ -2,9 +2,19 @@
 
 Dataset embedded di 200+ città italiane con CAP, provincia, regione, popolazione.
 Detection automatica nelle keywords/messaggi e arricchimento per password.
+
+Reverse geocoding (EXIF GPS → nome città) usa due livelli:
+  1. Dataset esteso geonames cities1000 (~150k città mondo) se presente in
+     ~/.horcrux/cities1000.tsv o env HORCRUX_CITIES_DATASET. Indexato in grid
+     spaziale 1°×1° per lookup O(1) sulla cella + 8 vicine.
+  2. Fallback al dataset embedded (60 città IT/EU) se geonames non disponibile.
+
+Per scaricare geonames: `python -m osint.setup_geonames` (script helper).
 """
 
+import os
 import re
+from pathlib import Path
 
 # ── Dataset città italiane ──────────────────────────────────────────────────
 # Format: "città" → (provincia, regione, popolazione_in_migliaia, cap_principale)
@@ -208,32 +218,125 @@ EURO_CAPITAL_COORDS: dict[str, tuple[float, float]] = {
 }
 
 
+# ── Geonames cities1000 dataset (lazy load + grid index) ─────────────────────
+
+_GEO_INDEX: dict[tuple[int, int], list[tuple]] | None = None  # (lat_int, lon_int) -> [(name, lat, lon, country, pop)]
+_GEO_INDEX_LOADED = False
+
+
+def _geonames_path() -> Path:
+    """Path del dataset geonames cities1000.tsv. Override via env."""
+    env = os.environ.get("HORCRUX_CITIES_DATASET", "").strip()
+    if env:
+        return Path(env)
+    return Path.home() / ".horcrux" / "cities1000.tsv"
+
+
+def _build_geo_index() -> dict[tuple[int, int], list[tuple]] | None:
+    """Carica geonames cities1000.tsv e costruisce indice spaziale.
+    Format atteso (geonames standard, TSV 19 colonne):
+      geonameid, name, asciiname, alt_names, lat, lon, fclass, fcode,
+      country, cc2, admin1..admin4, population, elevation, dem, tz, mod_date
+    Ritorna None se il file manca o non parsabile.
+    """
+    path = _geonames_path()
+    if not path.exists() or not path.is_file():
+        return None
+    index: dict[tuple[int, int], list[tuple]] = {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                cols = line.rstrip("\n").split("\t")
+                if len(cols) < 15:
+                    continue
+                try:
+                    lat = float(cols[4])
+                    lon = float(cols[5])
+                    pop = int(cols[14] or "0")
+                except (ValueError, IndexError):
+                    continue
+                name = cols[1] or cols[2]
+                country = cols[8] or ""
+                if not name:
+                    continue
+                cell = (int(lat), int(lon))
+                index.setdefault(cell, []).append(
+                    (name, lat, lon, country, pop)
+                )
+    except OSError:
+        return None
+    return index if index else None
+
+
+def _get_geo_index() -> dict[tuple[int, int], list[tuple]] | None:
+    """Lazy singleton. Costruito una sola volta per processo."""
+    global _GEO_INDEX, _GEO_INDEX_LOADED
+    if _GEO_INDEX_LOADED:
+        return _GEO_INDEX
+    _GEO_INDEX = _build_geo_index()
+    _GEO_INDEX_LOADED = True
+    return _GEO_INDEX
+
+
 def reverse_geocode(lat: float, lon: float, max_km: float = 30.0) -> dict | None:
     """Trova la città piu' vicina a (lat, lon) entro `max_km`.
 
-    Restituisce dict con name/lat/lon/distance_km, o None se nessuna citta'
-    nei dataset embedded e' abbastanza vicina. Usa Haversine semplificata
-    (approx Euclidea su gradi: ok per scopi di matching grossolano).
+    Strategia:
+      - Se cities1000 e' caricato: cerca nelle 9 celle 1°×1° (target+8 vicine),
+        scegli la nearest via Haversine approx. Copertura mondiale ~150k città.
+      - Altrimenti fallback al dataset embedded IT/EU (~70 città).
+
+    Ritorna dict {name, lat, lon, distance_km, country?, population?} o None.
     """
     if not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
         return None
-    best: tuple[float, str, float, float] | None = None  # (km, name, clat, clon)
-    # 1 grado lat ≈ 111 km; 1 grado lon ≈ 111*cos(lat) km
+
     import math
     cos_lat = max(0.1, math.cos(math.radians(lat)))
-    for name, (clat, clon) in {**IT_CITY_COORDS, **EURO_CAPITAL_COORDS}.items():
+
+    def _km(clat: float, clon: float) -> float:
         dlat = (lat - clat) * 111.0
         dlon = (lon - clon) * 111.0 * cos_lat
-        km = math.sqrt(dlat * dlat + dlon * dlon)
-        if best is None or km < best[0]:
-            best = (km, name, clat, clon)
-    if best is None or best[0] > max_km:
+        return math.sqrt(dlat * dlat + dlon * dlon)
+
+    index = _get_geo_index()
+    if index is not None:
+        # Cerca nelle 9 celle adiacenti (sufficienti per max_km < ~111km)
+        target_cell = (int(lat), int(lon))
+        candidates: list[tuple] = []
+        for dlat_c in (-1, 0, 1):
+            for dlon_c in (-1, 0, 1):
+                cell = (target_cell[0] + dlat_c, target_cell[1] + dlon_c)
+                candidates.extend(index.get(cell, ()))
+        if candidates:
+            best = min(candidates, key=lambda r: _km(r[1], r[2]))
+            km = _km(best[1], best[2])
+            if km <= max_km:
+                return {
+                    "name": best[0].lower().replace(" ", ""),
+                    "display_name": best[0],
+                    "lat": best[1],
+                    "lon": best[2],
+                    "country": best[3],
+                    "population": best[4],
+                    "distance_km": round(km, 2),
+                }
+        # Se non c'e' nulla nelle 9 celle, falliamo (oltre max_km comunque)
+        return None
+
+    # ── Fallback embedded (no geonames) ──
+    best_e: tuple[float, str, float, float] | None = None
+    for name, (clat, clon) in {**IT_CITY_COORDS, **EURO_CAPITAL_COORDS}.items():
+        km = _km(clat, clon)
+        if best_e is None or km < best_e[0]:
+            best_e = (km, name, clat, clon)
+    if best_e is None or best_e[0] > max_km:
         return None
     return {
-        "name": best[1],
-        "lat": best[2],
-        "lon": best[3],
-        "distance_km": round(best[0], 2),
+        "name": best_e[1],
+        "lat": best_e[2],
+        "lon": best_e[3],
+        "distance_km": round(best_e[0], 2),
     }
 
 

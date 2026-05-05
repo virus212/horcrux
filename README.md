@@ -20,6 +20,16 @@
 
 ---
 
+## 🆕 Novità v2.6 (2026-05-05) — quality patch
+
+- 🌍 **Reverse geocoding mondiale** (`osint/geo_intel.py`) — il vecchio dataset
+  embedded di ~70 città IT/UE è ora un fallback. Lazy loader di **geonames
+  cities1000** (~150k città del mondo, ~5 MB) con indice spaziale 1°×1° per
+  lookup O(1) sulla cella + 8 vicine. Setup one-shot via
+  `python -m osint.setup_geonames` (download + cache in `~/.horcrux/cities1000.tsv`).
+  Override path con env `HORCRUX_CITIES_DATASET`. Output ora include
+  `country` e `population` quando disponibili.
+
 ## 🆕 Novità v2.5 (2026-05-04)
 
 **PassGPT Hybrid + dialetti italiani + wordlists manager**:
