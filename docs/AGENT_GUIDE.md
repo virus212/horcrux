@@ -1,7 +1,12 @@
 # Dark Triad — Agent Guide
 
 > Guida AI-friendly per JARVIS (o qualsiasi agente AI) che orchestra TIH → Mihawk → Horcrux.
-> **Aggiornata al: 2026-05-04 — pipeline post FASE 1+2+3.**
+> **Aggiornata al: 2026-05-04 — pipeline post FASE 1+2+3+4 (JARVIS attivo).**
+
+> ★ **NB v2.5:** JARVIS è ora completo (Codex, Orchestrator, Hit Estimator, Wordlists Manager).
+> TIH ha ricevuto iOS backup decrypt + Android `.crypt15` + OCR + Whisper.
+> Horcrux ha ricevuto PassGPT hybrid + 30 dialetti italiani + wordlists manager.
+> Mihawk ha ricevuto enrich proxy + delete channel.
 
 ---
 
@@ -38,11 +43,12 @@ target rispetto a un dizionario manuale."
 - Italian-first NER (spaCy `it_core_news_sm`) → risultati migliori su target italiani rispetto a regex generiche
 
 **Stato sviluppo:**
-- ✅ FASE 1 TIH (estrazione + arricchimento dati)
-- ✅ FASE 2 Mihawk (visualizzazione + analisi cross-chat)
-- ✅ FASE 3 Horcrux (generazione wordlist + Smart Wizard + standalone mode)
-- 🟡 FASE 4 JARVIS (questo doc serve a costruirlo) — NON iniziata
-- 🟡 FASE 5 Documentazione finale + benchmark vs CUPP per la tesi
+- ✅ FASE 1 TIH (estrazione + arricchimento dati + iOS/Android decrypt + OCR + Whisper)
+- ✅ FASE 2 Mihawk (visualizzazione + analisi cross-chat + enrich proxy + delete)
+- ✅ FASE 3 Horcrux (generazione wordlist + Smart Wizard + standalone + PassGPT + dialetti IT)
+- ✅ FASE 4 JARVIS (orchestrator + Codex + hit estimator + decision logger + lifetime stats)
+- 🟡 FASE 5 OBELISK (modulo opsec VPN+Tor) — pending
+- 🟡 FASE 6 Documentazione finale + benchmark vs CUPP per la tesi
 
 **Cosa farà JARVIS quando lo costruiremo:**
 - Leggerà questo guide all'avvio per capire la pipeline
@@ -60,6 +66,7 @@ target rispetto a un dizionario manuale."
 - https://github.com/virus212/The-Invisible-Hand
 - https://github.com/virus212/Mihawk
 - https://github.com/virus212/horcrux
+- https://github.com/virus212/JARVIS  *(nuovo, FASE 4)*
 
 **Scelte di stile da rispettare quando lavori sul progetto:**
 - Modifiche chirurgiche, non rewrite di interi file
@@ -75,15 +82,17 @@ target rispetto a un dizionario manuale."
 ```
 ┌─────────────────┐      ┌──────────────┐      ┌────────────────┐      ┌──────────┐
 │ TheInvisibleHand│ ───▶ │   Mihawk     │ ───▶ │     JARVIS     │ ───▶ │ Horcrux  │
-│   (TIH, :5050)  │      │   (:5000)    │      │   (futuro AI)  │      │  (:5100) │
+│   (TIH, :5050)  │      │   (:5000)    │      │     (:5200)    │      │  (:5100) │
 │                 │      │              │      │                │      │          │
-│ Estrae chat     │      │ Visualizza + │      │ Sceglie i dati │      │ Genera   │
-│ Telegram/WA     │      │ analizza     │      │ giusti per il  │      │ wordlist │
-│ + EXIF, NER,    │      │ + cross-chat │      │ profilo target │      │ password │
-│   reazioni,     │      │   profili    │      │                │      │          │
-│   menzioni,     │      │              │      │                │      │          │
-│   forwards,     │      │              │      │                │      │          │
-│   author UID    │      │              │      │                │      │          │
+│ Estrae chat     │      │ Visualizza + │      │ Codex Big5 +   │      │ Genera   │
+│ Telegram/WA     │      │ analizza     │      │ feature select │      │ wordlist │
+│ + EXIF, NER,    │      │ + cross-chat │      │ + hit estimate │      │ + PassGPT│
+│   reazioni,     │      │   profili    │      │ + model choice │      │   hybrid │
+│   menzioni,     │      │ + enrich     │      │ + decision log │      │ + dialect│
+│   forwards,     │      │   proxy      │      │                │      │   IT     │
+│   author UID,   │      │              │      │                │      │          │
+│   OCR, Whisper, │      │              │      │                │      │          │
+│   iOS/Android   │      │              │      │                │      │          │
 └─────────────────┘      └──────────────┘      └────────────────┘      └──────────┘
         │                       │                                             │
         ▼                       ▼                                             ▼
@@ -486,7 +495,122 @@ GET /api/summary/Omar                  # Mihawk top persons/locations/forwards/e
 
 **v2.0 (2026-05-04):** TIH/Mihawk/Horcrux uniti via `author_uid`. Aggiunti EXIF, NER, reazioni, forward tracing, mentions, emoji translator, leet avanzato, wordlist exclusion, standalone mode, smart wizard summary panel.
 
+**v2.5 (2026-05-04):** JARVIS attivo (porta 5200), iOS/Android backup decrypt, OCR Tesseract, Whisper trascrizione, PassGPT hybrid Mode C, 30 dialetti italiani, wordlists manager, cross-app enrich proxy.
+
 **Roadmap:**
-- 1.5 Whisper trascrizione audio (RINVIATO)
-- 1.6 WhatsApp `.crypt15` decrypt (RINVIATO)
-- FASE 4: JARVIS AI orchestrator (questo documento serve a costruirlo)
+- ✅ 1.5 Whisper trascrizione audio (DONE)
+- ✅ 1.6 WhatsApp `.crypt15` decrypt (DONE)
+- ✅ 1.7 iOS WhatsApp backup decrypt (DONE — `iOSbackup` + parsing `ChatStorage.sqlite`)
+- ✅ FASE 4: JARVIS AI orchestrator (DONE)
+- 🟡 FASE 5: OBELISK opsec module (VPN + Tor toggle) — pending
+- 🟡 FASE 6: Benchmark vs CUPP/Mentalist + scrittura tesi finale
+
+---
+
+## 7. JARVIS (FASE 4) — AI Orchestrator
+
+**Path:** `/root/Desktop/JARVIS/`
+**Porta:** `5200`
+**Comando avvio:** `.venv/bin/python web_app.py`
+**Stack:** Flask + Anthropic SDK (Claude Opus 4.7 default) + SSO `toji`
+
+### 7.1 Endpoint principali
+
+| Endpoint | Method | Body / Risposta |
+|---|---|---|
+| `/api/orchestrate` | POST | `{channel, target_uid?, level, use_ml, extra_context}` → genera + spiega |
+| `/api/codex` | POST | `{channel, target_uid?, extra_context}` → identikit Big Five (12 sezioni) |
+| `/api/channels/<id>/users` | GET | dropdown utenti del canale (legge `_users.json` da Mihawk) |
+| `/api/wordlist/<channel>/<fmt>` | GET | proxy Horcrux export (txt\|hashcat\|john\|json) |
+| `/api/services/<id>/{status,start,stop,port,logs}` | GET/POST | controllo servizi |
+
+### 7.2 Schema risposta `/api/orchestrate`
+
+```json
+{
+  "ok": true,
+  "level": "medium",
+  "selected_features": ["names", "ner_persons", "ages_birth_years", "topics", "emoji_keywords"],
+  "rationale": "Profilo socievole con strong digital footprint...",
+  "hit_estimate": 0.74,
+  "model_choice": "claude-opus-4-7",
+  "wordlist_count": 3196,
+  "preview": ["Marco", "Lucia1995", "marcobjj", "..."],
+  "saved": "/path/to/wordlist.txt",
+  "decision_log": "jarvis_decisions/2026-05-04T12-34-56.json"
+}
+```
+
+### 7.3 Codex schema FLAT
+
+Per evitare l'errore Anthropic "compiled grammar too large" con nested objects + constraints,
+Codex usa schema **flat** (es. `openness_score` + `openness_evidence` come campi separati,
+non un oggetto `{score, evidence}`). Frontend chiama `_to_nested(flat)` per il rendering.
+
+12 sezioni: Big Five (5 tratti flat), schedule, social, locations, occupation, interests,
+linguistic, security_questions (5 fissi), risk_factors, confidence_overall, data_quality_notes.
+
+### 7.4 Hit estimator + model heuristic
+
+`hit_estimate` 0–1 = somma pesata categorie selezionate (`leaked_passwords=0.45`, `names=0.15`,
+`ages_birth_years=0.10`, ecc.). `model_choice` derivato da `complexity_score 0-10`:
+- 0–3 → Haiku 4.5 (low-cost)
+- 4–7 → Sonnet 4.6 (default)
+- 8–10 → Opus 4.7 (max intelligence)
+
+### 7.5 File generati
+
+```
+JARVIS/
+├── jarvis_decisions/<timestamp>.json    # un record per ogni call (riproducibilità tesi)
+└── jarvis_lifetime_stats.json           # contatori cumulativi (calls, tokens, cost USD)
+```
+
+---
+
+## 8. v2.5 Deltas — endpoint aggiunti agli altri 3 ragazzi
+
+### 8.1 TIH (porta 5050) — Multi-modal extraction
+
+| Endpoint | Method | Descrizione |
+|---|---|---|
+| `/api/ios/list` | POST | `{backup_path, password}` → lista sessioni (count + tipo) |
+| `/api/ios/import` | POST | `{backup_path, password, session_ids[]}` → import sessioni selezionate |
+| `/api/android/list` | POST | `{crypt15_path, key_path}` → lista sessioni |
+| `/api/android/import` | POST | `{crypt15_path, key_path, session_ids[]}` (oppure multipart upload) |
+| `/api/enrich/<channel>/ocr` | POST | run Tesseract IT+EN su immagini, aggiunge `ocr_text` |
+| `/api/enrich/<channel>/audio` | POST | run faster-whisper su audio, aggiunge `transcription` |
+
+Workflow iOS/Android: **list** → utente seleziona chat → **import** (split per chat in folder
+Mihawk separati). Mai merge automatico.
+
+### 8.2 Mihawk (porta 5000) — Cross-app integration
+
+| Endpoint | Method | Descrizione |
+|---|---|---|
+| `/api/channels/<id>/enrich/<kind>` | POST | proxy verso TIH `/api/enrich/<channel>/{ocr,audio}` |
+| `/api/channels/<id>` | DELETE | rimuove cartella canale (path-traversal-safe) |
+
+### 8.3 Horcrux (porta 5100) — PassGPT hybrid + wordlists manager
+
+| Endpoint | Method | Descrizione |
+|---|---|---|
+| `/api/generate` | POST | (modificato) accetta `use_ml: bool` + `ml_weight: float` |
+| `/api/wordlists` | GET | lista tutte le wordlist con metadata (channel, count, size, modified, history) |
+| `/api/wordlist/<channel>` | DELETE | rimuove wordlist (con `?with_history=1` rimuove anche archive) |
+| `/wordlists` | GET (HTML) | pagina standalone con tabella + bottoni download/delete |
+
+### 8.4 Italian dialects (texting IT)
+
+`generator.py` applica `IT_DIALECT_MAP` (30+ regole) automaticamente in `medium`/`hard`:
+`che→ke`, `perché→xké`, `casa→kasa`, `qualcosa→qualkosa`, `comunque→cmq`, ecc.
+
+### 8.5 PassGPT hybrid Mode C
+
+`ml_generator.py` con lazy load + singleton cache. Cold-start ~5-10s solo prima invocazione.
+- `generate_conditional(prompts, samples_per_prompt)` — generazione condizionale
+- `score_passwords(list)` — log-likelihood normalizzato 0-1
+- `is_available()` — presence-check leggero (solo lib import, no model load)
+
+Score finale = `ml_weight × ml_score + (1 - ml_weight) × rule_score` (default `ml_weight=0.5`).
+CPU-only torch sufficiente: `pip install --index-url https://download.pytorch.org/whl/cpu torch`.
