@@ -246,6 +246,74 @@ TOPICS: dict[str, list[str]] = {
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# LEAKED PASSWORD PATTERNS — riconosce password citate direttamente in chat
+# ═══════════════════════════════════════════════════════════════════════════
+# Cattura il valore della password (gruppo 1) da frasi tipiche IT/EN.
+# La validazione successiva filtra i falsi positivi (aggettivi, parole comuni).
+
+LEAKED_PASSWORD_PATTERNS = [
+    # IT: "(la mia) password/pwd/pin/codice è X" + varianti :=
+    re.compile(
+        r"(?:la\s+)?(?:mia\s+|tua\s+|sua\s+|nuova\s+|vecchia\s+)?"
+        r"(?:password|pass|pwd|psw|pswd|chiave|codice|pin)"
+        r"\s*[:=]\s*[\"'`]?([^\s\"'`]{4,30})",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:la\s+)?(?:mia\s+|tua\s+|sua\s+|nuova\s+|vecchia\s+)?"
+        r"(?:password|pass|pwd|psw|chiave|pin|codice)"
+        r"\s+(?:è|e'|sara|sarà|era)\s+[\"'`]?([^\s\"'`]{4,30})",
+        re.IGNORECASE,
+    ),
+    # IT: "ho cambiato/messo/settato (la pwd) in/con X"
+    re.compile(
+        r"\bho\s+(?:cambiato|messo|settato|impostato|fatto|scelto|usato)\s+"
+        r"(?:la\s+)?(?:password|pwd|psw|chiave|pin|codice)?\s*"
+        r"(?:in|con|come|=)\s*[\"'`]?([^\s\"'`]{4,30})",
+        re.IGNORECASE,
+    ),
+    # EN: "(my) password/pwd/pin: X" + varianti
+    re.compile(
+        r"(?:my\s+|the\s+|new\s+|old\s+)?"
+        r"(?:password|pass|pwd|psw|key|pin|code|passcode)"
+        r"\s*[:=]\s*[\"'`]?([^\s\"'`]{4,30})",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:my\s+|the\s+|new\s+)?"
+        r"(?:password|pass|pwd|psw|key|pin|code)"
+        r"\s+is\s+[\"'`]?([^\s\"'`]{4,30})",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bi\s+(?:set|changed|made|chose|used|put)\s+"
+        r"(?:my\s+)?(?:password|pwd|psw|key|pin|code)\s+"
+        r"(?:to|as|=|into)\s+[\"'`]?([^\s\"'`]{4,30})",
+        re.IGNORECASE,
+    ),
+]
+
+# Falsi positivi: parole che seguono "la mia password è ..." ma non sono pwd.
+PASSWORD_FALSE_POSITIVES: frozenset[str] = frozenset({
+    # Aggettivi IT che descrivono la password
+    "sicura", "debole", "facile", "difficile", "semplice", "complessa",
+    "buona", "brutta", "lunga", "corta", "banale", "robusta", "blindata",
+    "scaduta", "vecchia", "nuova", "uguale", "diversa", "stessa", "solita",
+    "sicurissima", "facilissima", "lunghissima", "potente", "corta",
+    "scoperta", "rubata", "compromessa", "leakata",
+    # Risposte vaghe IT
+    "ok", "boh", "niente", "nada", "vuota", "niente", "uguale",
+    "qualcosa", "qualunque",
+    # EN adjectives
+    "strong", "weak", "easy", "hard", "secure", "insecure", "good", "bad",
+    "long", "short", "complex", "simple", "same", "different", "compromised",
+    "stolen", "leaked", "expired", "the", "a", "an", "old", "new",
+    # Generic
+    "ciao", "hello", "test", "prova", "tutto", "everything", "nothing",
+})
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # DATACLASS: Token con metadata completi
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -385,10 +453,24 @@ class TextAnalyzer:
 
     # ─── Cached properties ──────────────────────────────────────────────
 
+    @staticmethod
+    def _full_text(msg: dict) -> str:
+        """Restituisce TUTTO il testo associato a un msg: message + ocr_text
+        (da TIH OCR enrichment) + transcription (da Whisper). Cosi' NER,
+        keyword, leaked_passwords ecc. lavorano anche sul contenuto delle
+        immagini e dei messaggi vocali, non solo sul testo digitato.
+        """
+        parts = [msg.get("message") or ""]
+        if msg.get("ocr_text"):
+            parts.append(msg["ocr_text"])
+        if msg.get("transcription"):
+            parts.append(msg["transcription"])
+        return " ".join(p for p in parts if p)
+
     @property
     def all_text(self) -> str:
         if self._all_text is None:
-            self._all_text = " ".join(m.get("message", "") for m in self.messages)
+            self._all_text = " ".join(self._full_text(m) for m in self.messages)
         return self._all_text
 
     # ─── Normalization ──────────────────────────────────────────────────
@@ -421,7 +503,10 @@ class TextAnalyzer:
             if len(cleaned) >= 3:
                 self._add_token(cleaned, idx, sources={"username"})
 
-        text = msg.get("message", "")
+        # Includi anche ocr_text e transcription (TIH enrichment), cosi' i
+        # token estratti da immagini OCR-ed e audio trascritti finiscono
+        # nel grafo dei token alla pari del testo digitato.
+        text = self._full_text(msg)
         if not text:
             return
 
@@ -530,6 +615,11 @@ class TextAnalyzer:
         if fwd_topics:
             out["forward_topics"] = fwd_topics
 
+        # Leaked passwords: presente solo se ne troviamo almeno una
+        leaked = self.extract_leaked_passwords()
+        if leaked:
+            out["leaked_passwords"] = leaked
+
         return out
 
     @staticmethod
@@ -590,7 +680,7 @@ class TextAnalyzer:
         """Anni e date dd/mm/yyyy."""
         dates: set[str] = set()
         for msg in self.messages:
-            text = msg.get("message", "")
+            text = self._full_text(msg)
             for year in self.YEAR_RE.findall(text):
                 dates.add(year)
             for date in self.DATE_RE.findall(text):
@@ -602,7 +692,7 @@ class TextAnalyzer:
         counter: Counter = Counter()
         year_set = set(self.YEAR_RE.findall(self.all_text))
         for msg in self.messages:
-            text = msg.get("message", "")
+            text = self._full_text(msg)
             for num in self.NUMBER_RE.findall(text):
                 if num not in year_set:
                     counter[num] += 1
@@ -612,7 +702,7 @@ class TextAnalyzer:
         """Telefoni con varianti corte (last 4/6 digits)."""
         found: set[str] = set()
         for msg in self.messages:
-            text = msg.get("message", "")
+            text = self._full_text(msg)
             for match in self.PHONE_RE_IT.findall(text) + self.PHONE_RE_INTL.findall(text):
                 clean = re.sub(r"[\s.\-]", "", match)
                 if len(clean) >= 9:
@@ -627,7 +717,7 @@ class TextAnalyzer:
         """'ho 25 anni' → birth_year + short_year + age."""
         found: set[str] = set()
         for msg in self.messages:
-            text = msg.get("message", "")
+            text = self._full_text(msg)
             for match in self.AGE_RE.findall(text):
                 try:
                     age = int(match)
@@ -649,6 +739,42 @@ class TextAnalyzer:
                 counter[tok.normalized] += tok.frequency
         consolidated = _consolidate_plurals(counter)
         return [w for w, c in consolidated.most_common() if c >= 1]
+
+    def extract_leaked_passwords(self, top_n: int = 30) -> list[str]:
+        """Estrae password citate direttamente nel testo.
+
+        Riconosce pattern tipo "la mia pwd è X", "password: X", "i changed
+        my pin to X", ecc. Filtra falsi positivi (aggettivi tipo 'sicura',
+        'debole') e parole troppo comuni che non sono plausibili come pwd.
+
+        Score altissimo nel generator (CATEGORY_BASE_SCORE.leaked_passwords)
+        perche' sono candidati direttamente prelevati dal testo.
+        """
+        self.tokenize()
+        found: dict[str, int] = {}
+        for pat in LEAKED_PASSWORD_PATTERNS:
+            for m in pat.finditer(self.all_text):
+                # Strip solo punteggiatura di fine-frase (mai ! ? che possono
+                # essere caratteri legittimi di una password).
+                cand = m.group(1).strip().rstrip(".,;:)\"']")
+                if not cand or len(cand) < 4 or len(cand) > 30:
+                    continue
+                if cand.lower() in PASSWORD_FALSE_POSITIVES:
+                    continue
+                # Se il candidato è una parola comune molto frequente nel chat
+                # senza cifre/simboli, probabilmente è solo una parola normale
+                # ripresa per caso dalla regex (es. "...la pwd è cosa fai?").
+                tok = self.tokens.get(cand.lower())
+                if tok and not tok.has_digit and tok.frequency > 5:
+                    plausible = any(c.isupper() for c in cand) or any(
+                        not c.isalnum() for c in cand
+                    )
+                    if not plausible:
+                        continue
+                found[cand] = found.get(cand, 0) + 1
+        return [k for k, _ in sorted(
+            found.items(), key=lambda kv: (-kv[1], kv[0])
+        )][:top_n]
 
     def extract_keywords(self, top_n: int = 50, min_freq: int = 2,
                          exclude_names: list[str] | None = None) -> list[str]:
@@ -711,7 +837,7 @@ class TextAnalyzer:
         """Bigrammi frequenti escludendo stopwords."""
         counter: Counter = Counter()
         for msg in self.messages:
-            text = self.normalize(msg.get("message", "")).lower()
+            text = self.normalize(self._full_text(msg)).lower()
             words = re.findall(r"\b[a-zàèìòùáéíóú]{3,}\b", text)
             words = [w for w in words if w not in STOPWORDS]
             for i in range(len(words) - 1):
@@ -941,7 +1067,7 @@ class TextAnalyzer:
         q = query.lower()
 
         for idx, msg in enumerate(self.messages):
-            text = msg.get("message", "")
+            text = self._full_text(msg)
             text_lower = text.lower()
 
             start = 0
@@ -975,7 +1101,7 @@ class TextAnalyzer:
         co: Counter = Counter()
 
         for msg in self.messages:
-            text = self.normalize(msg.get("message", "")).lower()
+            text = self.normalize(self._full_text(msg)).lower()
             words = re.findall(r"\b[a-zàèìòùáéíóú]{2,}\b", text)
             for i, w in enumerate(words):
                 if w == term_lower:

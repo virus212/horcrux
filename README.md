@@ -20,6 +20,16 @@
 
 ---
 
+## 🆕 Novità v2.5 (2026-05-04)
+
+**PassGPT Hybrid + dialetti italiani + wordlists manager**:
+
+- 🤖 **PassGPT integration (Mode C)** — re-ranking ML hybrid via `javirandor/passgpt-10characters` (~58M params, USENIX 2024). Generazione condizionale + score di "umanità" (log-likelihood). Toggle `use_ml` in UI + API. Lazy load + singleton cache (cold-start ~5-10s solo prima invocazione). CPU-only torch sufficiente. Vedi `ml_generator.py`.
+- 🇮🇹 **Italian dialect mutations** — 30+ trasformazioni texting IT (`che→ke`, `perché→xké`, `casa→kasa`, `qualcosa→qualkosa`, ecc.). Le mutazioni si applicano automaticamente in `medium`/`hard`. Cattura il "lessico chat reale" del target. Vedi `IT_DIALECT_MAP` in `generator.py`.
+- 📋 **Wordlists Manager** (`/wordlists`) — pagina standalone con tabella di tutte le wordlist generate (channel, count, size, modified, history). Download in 4 formati + delete con doppia conferma e flag `?with_history=1`.
+- 📦 **Cross-app proxy** — JARVIS espone `/api/wordlist/<channel>/<fmt>` come proxy verso Horcrux export, così il dashboard JARVIS può scaricare wordlist senza aprire Horcrux.
+- 🧠 **`_full_text(msg)` helper in TextAnalyzer** — combina `message + ocr_text + transcription`, così tutte le feature (`names`, `keywords`, `leaked_passwords`, ...) lavorano automaticamente sul testo arricchito (OCR delle immagini, trascrizione audio).
+
 ## 🆕 Novità v2.0 (2026-05-04)
 
 **Smart Wizard** — l'auto wizard è stato esteso per essere usabile anche come password generator standalone:

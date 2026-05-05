@@ -1,1 +1,7 @@
 Flask>=3.0.0
+
+# PassGPT (USENIX 2024) — generatore password ML hybrid mode C
+# CPU-only torch consigliato:
+#   pip install --index-url https://download.pytorch.org/whl/cpu torch
+torch>=2.0
+transformers>=4.40

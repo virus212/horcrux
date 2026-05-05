@@ -18,10 +18,13 @@ NOTE LEGALI/ETICHE:
 
 from __future__ import annotations
 
+import functools
+import ipaddress
 import json
 import re
 import socket
 import subprocess
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -50,9 +53,71 @@ def _http_get(url: str, timeout: float = DEFAULT_TIMEOUT, headers: dict | None =
 
 
 # ════════════════════════════════════════════════════════════════════════
+# SSRF guard + cache (anti proxy abuse)
+# ════════════════════════════════════════════════════════════════════════
+
+def _is_safe_target_ip(ip_str: str) -> tuple[bool, str]:
+    """Valida un literal IP (v4/v6) e blocca range non-pubblici.
+    Blocca: private RFC1918/ULA, loopback, link-local (incl. 169.254.169.254
+    metadata cloud), multicast, reserved, unspecified.
+    Returns (is_safe, reason).
+    """
+    try:
+        ip = ipaddress.ip_address(ip_str)
+    except ValueError:
+        return False, "not a valid IP literal"
+    if ip.is_loopback:
+        return False, "loopback"
+    if ip.is_link_local:
+        return False, "link-local / metadata (169.254/16, fe80::/10)"
+    if ip.is_private:
+        return False, "private (RFC1918, ULA, etc.)"
+    if ip.is_multicast:
+        return False, "multicast"
+    if ip.is_reserved:
+        return False, "reserved"
+    if ip.is_unspecified:
+        return False, "unspecified (0.0.0.0 / ::)"
+    return True, "ok"
+
+
+def _ttl_cache(seconds: int = 300):
+    """Cache TTL in-memory per-process. Riduce proxy abuse verso le API esterne
+    e accelera richieste ripetute. Non distribuita (riavvio = reset).
+    """
+    def decorator(fn):
+        store: dict = {}
+
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            key = (args, tuple(sorted(kwargs.items())))
+            now = time.time()
+            entry = store.get(key)
+            if entry is not None:
+                value, expiry = entry
+                if now < expiry:
+                    return value
+            value = fn(*args, **kwargs)
+            # Non cachare errori di rete transitori (status 0)
+            if not (isinstance(value, dict) and value.get("error", "").startswith("network")):
+                store[key] = (value, now + seconds)
+            # Bound della cache: max 256 entries per funzione
+            if len(store) > 256:
+                # drop le 64 piu' vecchie
+                oldest = sorted(store.items(), key=lambda kv: kv[1][1])[:64]
+                for k, _ in oldest:
+                    store.pop(k, None)
+            return value
+
+        return wrapper
+    return decorator
+
+
+# ════════════════════════════════════════════════════════════════════════
 # 1. WHOIS lookup
 # ════════════════════════════════════════════════════════════════════════
 
+@_ttl_cache(seconds=600)
 def whois_lookup(domain: str) -> dict:
     """WHOIS via shell command. Pubblicamente accessibile.
 
@@ -126,11 +191,24 @@ def whois_lookup(domain: str) -> dict:
 # 2. DNS records
 # ════════════════════════════════════════════════════════════════════════
 
+@_ttl_cache(seconds=300)
 def dns_lookup(domain: str) -> dict:
     """DNS records via dig command (preferred) or socket fallback."""
     domain = domain.strip().lower()
     if not re.match(r"^[a-z0-9.\-]+\.[a-z]{2,}$", domain):
         return {"error": "invalid domain"}
+    # Difesa SSRF: rifiuta input che parsano come literal IP privati/loopback/
+    # link-local. Domini ARPA (es. 1.0.0.127.in-addr.arpa) restano permessi
+    # perche' la regex sopra li accetta — bloccarli richiederebbe whitelist.
+    try:
+        ipaddress.ip_address(domain)
+        # se arriva qui, e' un IP literal → la regex non lo accetterebbe
+        # ma per sicurezza ricontrolliamo
+        safe, reason = _is_safe_target_ip(domain)
+        if not safe:
+            return {"error": f"target IP blocked: {reason}"}
+    except ValueError:
+        pass  # non e' un IP literal, ok
 
     info = {"domain": domain, "records": {}}
 
@@ -170,12 +248,29 @@ def dns_lookup(domain: str) -> dict:
 # 3. IP geolocation
 # ════════════════════════════════════════════════════════════════════════
 
+@_ttl_cache(seconds=600)
 def ip_geolocation(ip: str) -> dict:
-    """IP geolocation via ipapi.co (free, no API key)."""
+    """IP geolocation via ipapi.co (free, no API key).
+
+    Difesa SSRF: blocca literal IP privati/loopback/link-local prima di
+    inoltrare a ipapi.co. Per domini, ipapi.co fa la risoluzione lato suo —
+    non e' un SSRF sul nostro host, ma blocchiamo anche literal IP per non
+    leakare info su reti interne in caso di mis-config.
+    """
     ip = ip.strip()
     # Validate: IPv4 or IPv6 or domain
     if not re.match(r"^[a-zA-Z0-9.:\-]+$", ip):
         return {"error": "invalid IP/domain"}
+
+    # Se l'input parsa come IP literal, applica blocklist
+    try:
+        ipaddress.ip_address(ip)
+        safe, reason = _is_safe_target_ip(ip)
+        if not safe:
+            return {"error": f"target IP blocked: {reason}"}
+    except ValueError:
+        # non e' un IP literal, presumibilmente un dominio → ok
+        pass
 
     url = f"https://ipapi.co/{ip}/json/"
     status, body = _http_get(url, timeout=10)
@@ -223,6 +318,7 @@ def ip_geolocation(ip: str) -> dict:
 # 4. Wayback Machine search
 # ════════════════════════════════════════════════════════════════════════
 
+@_ttl_cache(seconds=900)
 def wayback_search(query: str, limit: int = 20, max_retries: int = 2) -> dict:
     """Cerca uno username/dominio nel Wayback Machine.
 
@@ -289,6 +385,7 @@ def wayback_search(query: str, limit: int = 20, max_retries: int = 2) -> dict:
 # 5. Email reputation (EmailRep.io free)
 # ════════════════════════════════════════════════════════════════════════
 
+@_ttl_cache(seconds=900)
 def email_reputation(email: str) -> dict:
     """Email reputation via emailrep.io (free, no key for basic)."""
     email = email.strip()
@@ -333,6 +430,7 @@ def email_reputation(email: str) -> dict:
 # 6. GitHub user public info
 # ════════════════════════════════════════════════════════════════════════
 
+@_ttl_cache(seconds=600)
 def github_user_info(username: str) -> dict:
     """GitHub public user info via api.github.com (free, ~60 req/h unauth)."""
     username = username.strip()
@@ -398,6 +496,7 @@ def github_user_info(username: str) -> dict:
 # 7. Reddit user public info
 # ════════════════════════════════════════════════════════════════════════
 
+@_ttl_cache(seconds=600)
 def reddit_user_info(username: str) -> dict:
     """Reddit public user info via reddit.com/user/X/about.json (free)."""
     username = username.strip()
@@ -495,7 +594,6 @@ def parse_codice_fiscale(cf: str, epoca: str = "auto") -> dict:
         else:
             # Auto: heuristic considerando l'anno corrente
             from datetime import datetime as _dt
-            current_yy = _dt.now().year % 100
             # Se l'anno suggerirebbe una nascita futura nel 2000s,
             # va nel 1900s (es. yr=99 → 1999, non 2099)
             if 2000 + yr > _dt.now().year:

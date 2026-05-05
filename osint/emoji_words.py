@@ -40,7 +40,7 @@ EMOJI_TO_WORDS: dict[str, list[str]] = {
     "🎸": ["chitarra", "guitar", "rock"],
     "🎹": ["piano", "pianoforte"],
     "🥁": ["drums", "batteria"],
-    "🎤": ["mic", "singer", "cantante", "karaoke"],
+    "🎤": ["mic", "singer", "cantante", "karaoke", "rap"],
     "🎧": ["headphones", "cuffie", "music", "dj"],
     "🎺": ["trumpet", "tromba"],
     "🎻": ["violin", "violino"],
@@ -64,7 +64,6 @@ EMOJI_TO_WORDS: dict[str, list[str]] = {
     "📺": ["tv", "television"],
     "🎭": ["theater", "teatro", "drama"],
     "🎨": ["arte", "art", "paint"],
-    "🎤": ["mic", "singer", "rap"],
 
     # ── Cibo ──
     "🍕": ["pizza", "italia", "italy"],

@@ -21,6 +21,9 @@
         <span class="title-amber">⬢</span> HORCRUX <span class="title-amber">⬢</span>
       </div>
       <div class="mode-switch">
+        <a href="/wordlists" class="mode-link" title="Tutte le wordlist generate, download/delete">
+          📋 Wordlists
+        </a>
         <a href="/manual" class="mode-link" title="Crea wordlist manualmente, senza chat">
           ✍ Modalità Manuale
         </a>
@@ -453,6 +456,15 @@
                     <option value="base">Base (a→4, e→3, i→1, o→0)</option>
                     <option value="advanced">Avanzato (+ @, $, +, 9, 8)</option>
                   </select>
+                </div>
+                <div class="mutation-row" style="margin-top: 10px;">
+                  <label class="mutation-label" style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="useMlCheck">
+                    🧬 PassGPT augmentation
+                  </label>
+                  <small style="color: var(--text2, #888); font-size: 11px;">
+                    ML-based candidate generation + re-ranking. Cold start +5-10s, hit rate stimato +30-50%.
+                  </small>
                 </div>
               </div>
 

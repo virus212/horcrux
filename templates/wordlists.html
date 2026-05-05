@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HORCRUX · Gestione Wordlists</title>
+  <link rel="icon" type="image/png" href="/static/favicon.png">
+  <link rel="stylesheet" href="/static/ritual.css">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/manual.css">
+  <style>
+    body { background: #050505; color: #d0d0d0; font-family: 'JetBrains Mono', monospace; min-height: 100vh; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+    .page-title { font-size: 22px; color: #f0f0f0; letter-spacing: 1px; margin-bottom: 24px; }
+    .wl-table {
+      width: 100%; border-collapse: collapse; background: #0d0d0d;
+      border: 1px solid #2a2a2a; border-radius: 6px; overflow: hidden;
+    }
+    .wl-table thead { background: #141414; }
+    .wl-table th, .wl-table td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #1a1a1a; font-size: 13px; }
+    .wl-table th { color: #999; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 11px; }
+    .wl-table tbody tr:hover { background: #141414; }
+    .wl-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .wl-btn {
+      background: #1c1c1c; border: 1px solid #2a2a2a; color: #c0c0c0;
+      padding: 5px 10px; border-radius: 3px; font-family: inherit; font-size: 11px;
+      cursor: pointer; text-decoration: none; transition: all 0.15s;
+    }
+    .wl-btn:hover { background: #2a2a2a; color: #fff; border-color: #c0c0c0; }
+    .wl-btn-danger { color: #e74c3c; border-color: #e74c3c; }
+    .wl-btn-danger:hover { background: rgba(231, 76, 60, 0.1); color: #ff6b6b; }
+    .wl-channel { color: #c0c0c0; font-weight: 600; }
+    .wl-meta { color: #777; font-size: 11px; }
+    .empty-state { text-align: center; color: #666; padding: 60px 20px; font-style: italic; }
+  </style>
+</head>
+<body>
+  <header class="app-header" style="display:flex;align-items:center;gap:16px;padding:14px 24px;background:#0a0a0a;border-bottom:1px solid #2a2a2a;">
+    <a href="/" style="color:#c0c0c0;text-decoration:none;font-size:18px;">←</a>
+    <img src="/static/stemma.png" alt="Horcrux" style="height:28px;">
+    <span style="font-weight:bold;letter-spacing:3px;color:#c0c0c0;">HORCRUX</span>
+    <span style="color:#666;font-style:italic;">· Gestione Wordlists</span>
+    <span style="margin-left:auto;color:#666;font-size:12px;">
+      <a href="/logout" style="color:#999;text-decoration:none;">esci</a>
+    </span>
+  </header>
+
+  <main class="container">
+    <h1 class="page-title">📋 Wordlists generate</h1>
+    <p style="color:#888;margin-bottom:24px;font-size:13px;">
+      Tutte le wordlist prodotte da Horcrux. Da qui le scarichi, le elimini, e vedi la loro storia.
+    </p>
+
+    <div id="wl-container">
+      <p class="empty-state">caricamento...</p>
+    </div>
+  </main>
+
+  <script>
+    function fmtBytes(b) {
+      if (b < 1024) return b + ' B';
+      if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+      return (b/1024/1024).toFixed(2) + ' MB';
+    }
+    function fmtDate(iso) { return iso ? iso.replace('T', ' ').slice(0, 16) : '-'; }
+
+    async function loadWordlists() {
+      const c = document.getElementById('wl-container');
+      try {
+        const r = await fetch('/api/wordlists');
+        const data = await r.json();
+        if (!Array.isArray(data) || !data.length) {
+          c.innerHTML = '<p class="empty-state">Nessuna wordlist generata. Vai su <a href="/" style="color:#c0c0c0;">Home</a> per generarne una.</p>';
+          return;
+        }
+        const rows = data.map(w => `
+          <tr>
+            <td>
+              <div class="wl-channel">${escapeHtml(w.channel_name)}</div>
+              <div class="wl-meta">id: <code>${escapeHtml(w.channel_id)}</code></div>
+            </td>
+            <td><strong>${w.password_count.toLocaleString('it-IT')}</strong></td>
+            <td>${fmtBytes(w.size_bytes)}</td>
+            <td>${fmtDate(w.modified)}</td>
+            <td><span class="wl-meta">${w.history_count} versioni</span></td>
+            <td class="wl-actions">
+              <a class="wl-btn"        href="/api/export/${encodeURIComponent(w.channel_id)}/txt"     target="_blank">⤓ txt</a>
+              <a class="wl-btn"        href="/api/export/${encodeURIComponent(w.channel_id)}/hashcat" target="_blank">Hashcat</a>
+              <a class="wl-btn"        href="/api/export/${encodeURIComponent(w.channel_id)}/john"    target="_blank">John</a>
+              <a class="wl-btn"        href="/api/export/${encodeURIComponent(w.channel_id)}/json"    target="_blank">JSON</a>
+              <button class="wl-btn wl-btn-danger" data-cid="${w.channel_id}">🗑 elimina</button>
+            </td>
+          </tr>
+        `).join('');
+        c.innerHTML = `
+          <table class="wl-table">
+            <thead>
+              <tr>
+                <th>Canale</th><th>Password</th><th>Size</th><th>Modificata</th><th>History</th><th>Azioni</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        `;
+        c.querySelectorAll('.wl-btn-danger').forEach(b => b.addEventListener('click', () => deleteWl(b.dataset.cid)));
+      } catch (e) {
+        c.innerHTML = `<p class="empty-state">Errore: ${e}</p>`;
+      }
+    }
+
+    async function deleteWl(channelId) {
+      const withHistory = confirm(
+        `Eliminare wordlist di "${channelId}"?\n\n` +
+        `OK = solo la wordlist corrente\n` +
+        `ANNULLA = non fare nulla`
+      );
+      if (!withHistory) return;
+      const alsoHistory = confirm("Cancellare anche la _horcrux_history (versioni passate)?\n\nOK = sì\nANNULLA = solo la corrente");
+      try {
+        const r = await fetch(`/api/wordlist/${encodeURIComponent(channelId)}${alsoHistory ? '?with_history=1' : ''}`, {
+          method: 'DELETE',
+        });
+        const d = await r.json();
+        if (!r.ok || !d.ok) { alert('Errore: ' + (d.error || r.status)); return; }
+        alert('✓ ' + (d.deleted.length ? d.deleted.join(', ') : d.note));
+        loadWordlists();
+      } catch (e) {
+        alert('Errore di rete: ' + e);
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    loadWordlists();
+  </script>
+</body>
+</html>

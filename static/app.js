@@ -537,6 +537,9 @@ const app = {
         .map(s => s.trim())
         .filter(s => s.length > 0 && !s.startsWith("#"));
 
+      const useMlEl = document.getElementById("useMlCheck");
+      const useMl = useMlEl ? useMlEl.checked : false;
+
       const payload = {
         channel: this.state.selectedChannel,
         level: this.state.generatedLevel,
@@ -545,6 +548,7 @@ const app = {
         leet_level: leetLevel,
         exclude_common: excludeCommon,
         exclude_extra: excludeExtra,
+        use_ml: useMl,
       };
       if (this.state.selectedChannel === "_standalone" && this.state.standaloneTarget) {
         payload.target_name = this.state.standaloneTarget;

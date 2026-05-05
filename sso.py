@@ -7,10 +7,12 @@ Quando un'app fa login → scrive il token.
 Quando un'altra app riceve una request → legge il token, se valido auto-logga.
 
 Sicurezza:
-  - Token firmato HMAC con chiave (default dev, override via TOJI_SSO_KEY)
-  - File con permessi 0600 (solo l'utente proprietario)
-  - File in /tmp (volatile, sparisce al reboot)
-  - TTL 12 ore
+  - Token firmato HMAC-SHA256.
+  - Chiave: TOJI_SSO_KEY env var se settata, altrimenti chiave random
+    persistente in ~/.config/toji/sso_key (mode 600, condivisa tra le 3 app
+    perche' stesso utente -> stesso $HOME). Nessun fallback hardcoded.
+  - File token con permessi 0600 in /tmp (volatile).
+  - TTL 12 ore.
 """
 
 from __future__ import annotations
@@ -19,13 +21,58 @@ import hashlib
 import hmac
 import json
 import os
+import secrets
+import sys
 import time
 from pathlib import Path
 
 SSO_FILE = Path(os.environ.get("TOJI_SSO_FILE", "/tmp/.toji_sso.json"))
-_DEFAULT_KEY = "toji-ecosystem-default-key-change-via-env-TOJI_SSO_KEY"
-SSO_KEY = os.environ.get("TOJI_SSO_KEY", _DEFAULT_KEY).encode()
 SSO_TTL = int(os.environ.get("TOJI_SSO_TTL", 12 * 3600))
+
+_KEY_FILE = Path(os.environ.get(
+    "TOJI_SSO_KEY_FILE",
+    str(Path.home() / ".config" / "toji" / "sso_key"),
+))
+
+
+def _load_or_create_key() -> bytes:
+    """Risolve la chiave HMAC. Priorita':
+       1. env TOJI_SSO_KEY (qualsiasi stringa non vuota)
+       2. file ~/.config/toji/sso_key (32 byte random, generato al primo run)
+    Errore fatale se nessuna delle due strade riesce — niente default hardcoded.
+    """
+    env_key = os.environ.get("TOJI_SSO_KEY", "").strip()
+    if env_key:
+        return env_key.encode("utf-8")
+
+    try:
+        if _KEY_FILE.exists():
+            data = _KEY_FILE.read_bytes().strip()
+            if len(data) >= 16:
+                return data
+            # file presente ma corrotto: rigenera
+        _KEY_FILE.parent.mkdir(parents=True, exist_ok=True)
+        new_key = secrets.token_bytes(32)
+        _KEY_FILE.write_bytes(new_key)
+        try:
+            _KEY_FILE.chmod(0o600)
+        except OSError:
+            pass
+        print(
+            f"[toji-sso] generata nuova chiave HMAC in {_KEY_FILE} "
+            "(impostala via TOJI_SSO_KEY per produzione/CI)",
+            file=sys.stderr,
+        )
+        return new_key
+    except OSError as e:
+        raise RuntimeError(
+            f"toji-sso: impossibile leggere o creare la chiave HMAC ({e}). "
+            "Imposta TOJI_SSO_KEY oppure rendi scrivibile "
+            f"{_KEY_FILE.parent}."
+        ) from e
+
+
+SSO_KEY = _load_or_create_key()
 
 
 def _sign(body: str) -> str:

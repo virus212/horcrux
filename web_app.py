@@ -197,6 +197,12 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/wordlists")
+@login_required
+def wordlists_page():
+    return render_template("wordlists.html")
+
+
 @app.route("/api/channels")
 @login_required
 @validate_input
@@ -229,6 +235,85 @@ def api_channels():
             "has_profile": has_profile,
         })
     return jsonify(result)
+
+
+@app.route("/api/wordlists")
+@login_required
+@safe_endpoint
+def api_wordlists():
+    """Lista tutte le wordlist generate per ogni canale, con metadata."""
+    out = []
+    if not MIHAWK_DIR.is_dir():
+        return jsonify(out)
+    for entry in sorted(MIHAWK_DIR.iterdir()):
+        if not entry.is_dir() or entry.name.startswith((".", "_")):
+            continue
+        wl = entry / "wordlist.txt"
+        if not wl.exists():
+            continue
+        try:
+            stat = wl.stat()
+            with open(wl, encoding="utf-8", errors="replace") as f:
+                count = sum(1 for line in f if line.strip() and not line.startswith("#"))
+        except OSError:
+            continue
+        history_dir = entry / "_horcrux_history"
+        history_count = 0
+        if history_dir.is_dir():
+            history_count = sum(1 for f in history_dir.iterdir() if f.is_file())
+        # Channel name dal _label.txt
+        label_file = entry / "_label.txt"
+        try:
+            channel_name = label_file.read_text(encoding="utf-8").strip() if label_file.exists() else entry.name
+        except OSError:
+            channel_name = entry.name
+        out.append({
+            "channel_id":  entry.name,
+            "channel_name": channel_name,
+            "password_count": count,
+            "size_bytes":  stat.st_size,
+            "modified":    datetime.fromtimestamp(stat.st_mtime).isoformat(timespec="seconds"),
+            "history_count": history_count,
+        })
+    out.sort(key=lambda w: w["modified"], reverse=True)
+    return jsonify(out)
+
+
+@app.route("/api/wordlist/<channel_id>", methods=["DELETE"])
+@login_required
+@safe_endpoint
+def api_wordlist_delete(channel_id: str):
+    """Cancella wordlist.txt di un canale + opzionalmente la history."""
+    channel_dir = resolve_channel_dir(channel_id)
+    if channel_dir is None:
+        return jsonify({"error": "canale non trovato"}), 404
+    wl = channel_dir / "wordlist.txt"
+    deleted_files = []
+    if wl.exists():
+        try:
+            wl.unlink()
+            deleted_files.append("wordlist.txt")
+        except OSError as e:
+            return jsonify({"error": f"errore: {e}"}), 500
+    # Cancella anche history se presente e l'utente la chiede
+    if request.args.get("with_history") == "1":
+        hd = channel_dir / "_horcrux_history"
+        if hd.is_dir():
+            n = 0
+            for f in hd.iterdir():
+                try:
+                    f.unlink()
+                    n += 1
+                except OSError:
+                    pass
+            try:
+                hd.rmdir()
+                deleted_files.append(f"_horcrux_history ({n} file)")
+            except OSError:
+                deleted_files.append(f"_horcrux_history ({n} file, dir non rimossa)")
+    if not deleted_files:
+        return jsonify({"ok": True, "deleted": [], "note": "niente da cancellare"})
+    return jsonify({"ok": True, "deleted": deleted_files})
 
 
 @app.route("/api/extract")
@@ -368,6 +453,11 @@ def api_generate():
     leet_level = data.get("leet_level", "auto")
     exclude_common = bool(data.get("exclude_common", True))
     exclude_extra = data.get("exclude_extra") or []
+    use_ml = bool(data.get("use_ml", False))
+    try:
+        ml_weight = float(data.get("ml_weight", 0.4))
+    except (TypeError, ValueError):
+        ml_weight = 0.4
 
     if not channel_id:
         return jsonify({"error": "channel required"}), 400
@@ -389,6 +479,7 @@ def api_generate():
         wordlist, drop_stats = generate_wordlist(
             features, level=level, manual_keys=manual_keys, return_stats=True,
             leet_level=leet_level, exclude_common=exclude_common, exclude_extra=exclude_extra,
+            use_ml=use_ml, ml_weight=ml_weight,
         )
         wordlist_path = out_root / f"{target_safe}.txt"
         header = f"# Horcrux standalone · {datetime.now().strftime('%Y-%m-%d %H:%M')} · target={target_name} · level={level}\n"
@@ -411,6 +502,7 @@ def api_generate():
     wordlist, drop_stats = generate_wordlist(
         features, level=level, manual_keys=manual_keys, return_stats=True,
         leet_level=leet_level, exclude_common=exclude_common, exclude_extra=exclude_extra,
+        use_ml=use_ml, ml_weight=ml_weight,
     )
 
     wordlist_path = channel_dir / "wordlist.txt"
